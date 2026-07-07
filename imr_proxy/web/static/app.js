@@ -1,0 +1,1 @@
+const f=document.getElementById('filter');if(f){f.addEventListener('input',()=>{const n=f.value.toLowerCase();document.querySelectorAll('#flows tbody tr').forEach(r=>r.style.display=r.innerText.toLowerCase().includes(n)?'':'none')})}

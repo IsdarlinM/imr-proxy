@@ -1,0 +1,1 @@
+OWASP_SECURE_HEADERS="OWASP Secure Headers Project"; OWASP_ASVS="OWASP ASVS"; OWASP_WSTG="OWASP WSTG"; OWASP_SESSION="OWASP Session Management Cheat Sheet"; OWASP_CORS="OWASP CORS guidance"; MDN_HEADERS="MDN HTTP headers documentation"; MOZILLA_TLS="Mozilla TLS guidance"; RFC_9110="RFC 9110 HTTP Semantics"; RFC_6265="RFC 6265 HTTP State Management Mechanism"

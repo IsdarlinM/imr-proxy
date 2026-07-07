@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block content %}<h2>Certificates</h2><p>imr-proxy never installs a CA automatically. Generate/export with CLI and install manually only in authorized test clients.</p>{% if error %}<p class="error">{{ error }}</p>{% endif %}{% if info %}<pre>{{ info }}</pre>{% else %}<p>No CA information available.</p>{% endif %}<pre>imr-proxy ca init --ca-dir ~/.imr-proxy/ca
+imr-proxy ca export --ca-dir ~/.imr-proxy/ca --output imr-proxy-ca.pem</pre>{% endblock %}
