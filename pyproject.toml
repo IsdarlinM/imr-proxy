@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "imr-proxy"
-version = "0.1.1"
+version = "0.1.2"
 description = "Defensive HTTP/HTTPS inspection proxy for authorized security testing."
 readme = "README.md"
 requires-python = ">=3.11"

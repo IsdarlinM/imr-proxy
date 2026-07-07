@@ -9,6 +9,9 @@ PYTHON_INSTALL_PREFIX="${PYTHON_INSTALL_PREFIX:-$HOME/.local/imr-proxy/python-${
 ASSUME_YES="${IMR_PROXY_ASSUME_YES:-0}"
 PYTHON_BIN="${PYTHON_BIN:-}"
 DETECTED_PYTHON=""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+VENV_DIR="$PROJECT_ROOT/.venv"
 
 log() { printf '[*] %s\n' "$*" >&2; }
 warn() { printf '[!] %s\n' "$*" >&2; }
@@ -45,7 +48,7 @@ find_python() {
     local candidate
     for candidate in "${candidates[@]}"; do
         if command -v "$candidate" >/dev/null 2>&1 && is_python_compatible "$candidate"; then
-            printf '%s\n' "$candidate"
+            command -v "$candidate"
             return 0
         fi
     done
@@ -168,16 +171,27 @@ ensure_python() {
 
 main() {
     log "Installing imr-proxy"
+    log "Project root: $PROJECT_ROOT"
+    [[ -f "$PROJECT_ROOT/pyproject.toml" ]] || fail "pyproject.toml was not found at $PROJECT_ROOT. Keep scripts/ inside the project root."
+
+    if [[ -d "$SCRIPT_DIR/.venv" ]]; then
+        warn "A previous virtual environment exists inside scripts/.venv. It is not used anymore. You can delete it after this install succeeds: $SCRIPT_DIR/.venv"
+    fi
+
     ensure_python
     local python_cmd="$DETECTED_PYTHON"
     log "Using Python: $python_cmd ($($python_cmd --version))"
 
-    "$python_cmd" -m venv .venv
-    # shellcheck source=/dev/null
-    source .venv/bin/activate
-    python -m pip install --upgrade pip setuptools wheel
-    python -m pip install -e .
-    log "Installed. Run: source .venv/bin/activate && imr-proxy --version"
+    "$python_cmd" -m venv "$VENV_DIR"
+    "$VENV_DIR/bin/python" -m pip install --upgrade pip setuptools wheel
+    (
+        cd "$PROJECT_ROOT"
+        "$VENV_DIR/bin/python" -m pip install -e .
+    )
+    log "Installed successfully."
+    log "Activate it with: cd '$PROJECT_ROOT' && source .venv/bin/activate"
+    log "Check version with: imr-proxy --version"
+    log "Direct command without activation: '$VENV_DIR/bin/imr-proxy' --version"
 }
 
 main "$@"

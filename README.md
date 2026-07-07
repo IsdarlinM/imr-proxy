@@ -8,7 +8,7 @@
 ██║██║ ╚═╝ ██║██║  ██║      ██║     ██║  ██║╚██████╔╝██╔╝ ██╗   ██║
 ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 Defensive HTTP/HTTPS Inspection Proxy
-Version: 0.1.1
+Version: 0.1.2
 ```
 
 imr-proxy is a professional defensive HTTP/HTTPS inspection proxy for authorized security assessments, internal audits, QA testing, developer debugging, lab environments, and bug bounty scopes.
@@ -52,7 +52,7 @@ cd imr-proxy
 bash scripts/install_linux.sh
 ```
 
-The Linux installer now checks for Python 3.11+. If a compatible interpreter is missing, it asks before installing anything. After confirmation, it first tries the detected package manager (`apt`, `dnf`, `yum`, `pacman`, or `zypper`). If that is not available or not suitable, it can download and build Python 3.11.15 from the official python.org source release into `~/.local/imr-proxy/python-3.11.15`. It never installs Python silently.
+The Linux installer checks for Python 3.11+. If a compatible interpreter is missing, it asks before installing anything. After confirmation, it first tries the detected package manager (`apt`, `dnf`, `yum`, `pacman`, or `zypper`). If that is not available or not suitable, it can download and build Python 3.11.15 from the official python.org source release into `~/.local/imr-proxy/python-3.11.15`. It never installs Python silently. The installer resolves the project root from the script location, so it works from either the project root or the `scripts/` directory, and creates the virtual environment at `<project-root>/.venv`.
 
 Useful installer overrides:
 
@@ -80,7 +80,7 @@ cd imr-proxy
 powershell -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1
 ```
 
-The Windows installer now checks for Python 3.11+ using the Python launcher and common `python` commands. If Python 3.11+ is missing, it asks before downloading and running the official Python 3.11.9 64-bit installer from python.org. Python.org marks 3.11.9 as the last full 3.11 bugfix release with Windows binary installers; newer 3.11 security releases are source-only. The script does not change PowerShell execution policy.
+The Windows installer checks for Python 3.11+ using the Python launcher and common `python` commands. If Python 3.11+ is missing, it asks before downloading and running the official Python 3.11.9 64-bit installer from python.org. Python.org marks 3.11.9 as the last full 3.11 bugfix release with Windows binary installers; newer 3.11 security releases are source-only. The script does not change PowerShell execution policy. The installer resolves the project root from the script location, so it works from either the project root or the `scripts/` directory, and creates the virtual environment at `<project-root>\.venv`.
 
 Useful installer options:
 
@@ -93,12 +93,15 @@ Useful installer options:
 Manual:
 
 ```powershell
+cd C:\Path\To\imr-proxy
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e .
 imr-proxy --version
 ```
+
+If you previously ran version 0.1.1 from `scripts/`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.2 because the correct environment is `<project-root>\.venv`.
 
 ## Quick start
 

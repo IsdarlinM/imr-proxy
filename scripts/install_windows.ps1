@@ -8,6 +8,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Resolve-Path (Join-Path $ScriptDir "..")
+$VenvDir = Join-Path $ProjectRoot ".venv"
+$VenvPython = Join-Path $VenvDir "Scripts\python.exe"
+
 function Write-Info([string]$Message) {
     Write-Host "[*] $Message"
 }
@@ -23,6 +28,13 @@ function Confirm-Action([string]$Prompt) {
 
     $reply = Read-Host "$Prompt [y/N]"
     return $reply -match '^(y|yes)$'
+}
+
+function Invoke-NativeChecked([string]$Command, [string[]]$Arguments) {
+    & $Command @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code $LASTEXITCODE`: $Command $($Arguments -join ' ')"
+    }
 }
 
 function Test-PythonCompatible([string]$Command, [string[]]$Arguments) {
@@ -109,6 +121,17 @@ function Invoke-Python([hashtable]$PythonCommand, [string[]]$Arguments) {
 }
 
 Write-Info "Installing imr-proxy"
+Write-Info "Project root: $ProjectRoot"
+
+if (-not (Test-Path (Join-Path $ProjectRoot "pyproject.toml"))) {
+    throw "pyproject.toml was not found at $ProjectRoot. Run this script from the extracted imr-proxy project, or keep the scripts directory inside the project root."
+}
+
+$legacyVenv = Join-Path $ScriptDir ".venv"
+if (Test-Path $legacyVenv) {
+    Write-Warn "A previous virtual environment exists inside scripts\.venv. It is not used anymore. You can delete it manually after this install succeeds: $legacyVenv"
+}
+
 $pythonCommand = Get-PythonCommand
 if ($null -eq $pythonCommand) {
     Install-Python311
@@ -122,9 +145,19 @@ if ($null -eq $pythonCommand) {
 $versionOutput = & $pythonCommand.Command @($pythonCommand.Arguments + @("--version"))
 Write-Info "Using Python: $versionOutput"
 
-Invoke-Python -PythonCommand $pythonCommand -Arguments @("-m", "venv", ".venv")
-. .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -e .
-Write-Info "Installed. Run: .\.venv\Scripts\Activate.ps1; imr-proxy --version"
+Invoke-Python -PythonCommand $pythonCommand -Arguments @("-m", "venv", $VenvDir)
+Invoke-NativeChecked -Command $VenvPython -Arguments @("-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel")
+Push-Location $ProjectRoot
+try {
+    Invoke-NativeChecked -Command $VenvPython -Arguments @("-m", "pip", "install", "-e", ".")
+}
+finally {
+    Pop-Location
+}
+
+$CommandPath = Join-Path $VenvDir "Scripts\imr-proxy.exe"
+Write-Info "Installed successfully."
+Write-Info "Activate it with: cd `"$ProjectRoot`"; .\.venv\Scripts\Activate.ps1"
+Write-Info "Check version with: imr-proxy --version"
+Write-Info "Direct command without activation: `"$CommandPath`" --version"
 Write-Info "This script does not change execution policy."

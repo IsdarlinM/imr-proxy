@@ -2,6 +2,18 @@
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.1.2] - 2026-07-07
+
+### Fixed
+- Fixed Windows installer path handling when the script is executed from `scripts/`. It now resolves the project root before running `pip install -e .`.
+- Fixed Linux installer path handling so the virtual environment is created at the project root instead of the current working directory.
+- Installer native command failures now stop the install instead of printing a false success message.
+- Development helper scripts now also resolve the project root correctly.
+
+### Changed
+- Windows installer now installs into `<project-root>\.venv` and prints both activated and direct executable commands.
+- Linux installer now installs into `<project-root>/.venv` and prints both activated and direct executable commands.
+
 ## [0.1.1] - 2026-07-07
 
 ### Changed
