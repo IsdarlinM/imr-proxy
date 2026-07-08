@@ -2,6 +2,24 @@
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.1.6] - 2026-07-08
+
+### Fixed
+- Fixed mitmproxy startup failure in default TLS passthrough mode by omitting the `confdir` option when no local CA directory is required.
+- Added regression tests to ensure `confdir` is only passed to mitmproxy as a string.
+- Documented reinstall steps for Windows launchers that still point to an older checkout.
+- Disabled uvicorn ANSI-colored logs to avoid raw escape sequences in Windows CMD/PowerShell output.
+
+## [0.1.5] - 2026-07-08
+
+### Changed
+- Changed required `mitmproxy` dependency from `>=12.0.0` to `>=11.0.0`.
+- Windows installation now uses only `scripts/install_windows.cmd` as the supported installer.
+
+### Removed
+- Removed `scripts/install_windows.ps1` to avoid PowerShell Execution Policy issues.
+- Removed `scripts/dev_windows.ps1`; Windows development should use the CMD installer or manual venv commands.
+
 ## [0.1.4] - 2026-07-08
 
 ### Fixed

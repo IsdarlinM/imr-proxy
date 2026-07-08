@@ -30,4 +30,5 @@ def create_app(config):
     return app
 def run_web(config):
     import uvicorn
-    uvicorn.run(create_app(config), host=config.web_host, port=config.web_port, log_level="info" if not config.quiet else "error")
+    # Disable uvicorn ANSI colors to avoid raw escape sequences on Windows CMD/PowerShell.
+    uvicorn.run(create_app(config), host=config.web_host, port=config.web_port, log_level="info" if not config.quiet else "error", use_colors=False)

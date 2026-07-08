@@ -8,7 +8,7 @@
 ██║██║ ╚═╝ ██║██║  ██║      ██║     ██║  ██║╚██████╔╝██╔╝ ██╗   ██║
 ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 Defensive HTTP/HTTPS Inspection Proxy
-Version: 0.1.4
+Version: 0.1.6
 ```
 
 imr-proxy is a professional defensive HTTP/HTTPS inspection proxy for authorized security assessments, internal audits, QA testing, developer debugging, lab environments, and bug bounty scopes.
@@ -44,6 +44,8 @@ Use this tool only on systems you own or are explicitly authorized to test. Do n
 
 `imr_proxy/proxy/engine.py` starts mitmproxy programmatically. `imr_proxy/proxy/addons.py` captures HTTP flows, redacts secrets, stores traffic, and invokes `imr_proxy/findings/engine.py`. Data is persisted in SQLite through `imr_proxy/storage`. The web UI and exporters read the same database.
 
+Runtime dependency note: this release requires `mitmproxy>=11.0.0`.
+
 ## Installation on Linux
 
 ```bash
@@ -74,7 +76,7 @@ imr-proxy --version
 
 ## Installation on Windows
 
-Recommended installer for Windows is now **CMD**, not PowerShell. This avoids PowerShell `ExecutionPolicy` blocks.
+Recommended installer for Windows is **CMD**, not PowerShell. This avoids PowerShell `ExecutionPolicy` blocks. The project no longer ships `.ps1` installers.
 
 ```bat
 git clone <repo> imr-proxy
@@ -104,11 +106,7 @@ It asks before adding that folder to your user `PATH`. After PATH is updated, op
 imr-proxy --version
 ```
 
-PowerShell installer is still included as optional legacy support:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1
-```
+PowerShell `.ps1` installers are intentionally not included. Use the CMD installer to avoid Windows Execution Policy blocks.
 
 Manual CMD install:
 
@@ -121,7 +119,7 @@ python -m pip install -e .
 imr-proxy --version
 ```
 
-If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.4 because the correct environment is `<project-root>\.venv`.
+If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.6 because the correct environment is `<project-root>\.venv`.
 
 ## Quick start
 
@@ -215,6 +213,21 @@ Default redaction is `balanced`. Strict mode masks more aggressively. Off mode m
 Redacted by default: Authorization, Cookie, Set-Cookie, API keys, tokens, passwords, secrets, session identifiers, JWTs, bearer/basic credentials, credit-card-like values, and optionally emails in strict mode.
 
 ## Troubleshooting
+
+### Windows launcher still shows an old version
+
+If `%USERPROFILE%\.imr-proxy\bin\imr-proxy.cmd` starts an older checkout, reinstall from the new project root:
+
+```bat
+cd C:\Path\To\imr-proxy
+scripts\install_windows.cmd
+```
+
+The installer rewrites the user launcher so it points to the current project `.venv`. Open a new CMD or PowerShell window after PATH changes.
+
+### mitmproxy `confdir` TypeError on startup
+
+Version 0.1.6 fixes startup failures like `TypeError: Expected <class 'str'> for confdir, but got <class 'NoneType'>`. The proxy now omits `confdir` unless HTTPS interception/local CA mode actually needs a custom CA directory.
 
 - TLS errors: export and manually trust the local CA in the authorized test client.
 - No HTTPS body visibility: enable `--intercept-https`, use `--cert-mode local-ca`, and trust the CA.
