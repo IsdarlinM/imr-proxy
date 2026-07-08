@@ -8,7 +8,7 @@ version = "0.1.2"
 description = "Defensive HTTP/HTTPS inspection proxy for authorized security testing."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "imr-proxy contributors" }]
 keywords = ["proxy", "security", "http", "https", "mitmproxy", "devsecops"]
 dependencies = [
@@ -38,3 +38,7 @@ imr_proxy = ["storage/schema.sql", "reporting/templates/*.j2", "web/templates/*.
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+include = ["imr_proxy*"]
+exclude = ["configs*", "scripts*", "docs*", "tests*"]
