@@ -15,3 +15,10 @@ Safe defaults:
 - CA installation is never automatic.
 
 If the local CA private key is exposed, remove the CA from trust stores and run `imr-proxy ca rotate`.
+
+
+## Default Web UI credentials
+
+The first-run console user is `admin:admin` only when the SQLite user table is empty. This is for local bootstrap only. Change the password immediately with `imr-proxy users passwd admin` or from the Users page. Do not bind the Web UI remotely while default credentials are active.
+
+Console passwords are stored with PBKDF2-HMAC-SHA256 and random salts. Web sessions are stored server-side as token hashes and delivered through HttpOnly `SameSite=Lax` cookies.

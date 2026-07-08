@@ -4,6 +4,18 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [0.1.8] - 2026-07-08
 
+### Added
+- Added cyber-themed Web UI redesign with sidebar navigation, dashboard metrics, searchable traffic table, improved detail pages, and responsive styling.
+- Added Web UI login portal with first-run `admin:admin` bootstrap credentials.
+- Added SQLite-backed console users and server-side Web UI sessions.
+- Added Web UI user creation, password reset, enable/disable actions, and authenticated API access.
+- Added CLI user management commands: `users list`, `users create`, `users passwd`, `users enable`, `users disable`, and `users delete`.
+
+### Security
+- Web UI and `/api/*` routes now require authentication.
+- Console passwords are stored with PBKDF2-HMAC-SHA256 and per-user random salts.
+- Web sessions are stored as SHA-256 token hashes and delivered with HttpOnly `SameSite=Lax` cookies.
+
 ### Fixed
 - Fixed Linux test parity by removing the pytest async plugin dependency from the mitmproxy engine regression test.
 - Fixed Linux installer command exposure by creating a user launcher at `~/.local/bin/imr-proxy`.

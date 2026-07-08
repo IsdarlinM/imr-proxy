@@ -1,2 +1,13 @@
-{% extends "base.html" %}{% block content %}<h2>Certificates</h2><p>imr-proxy never installs a CA automatically. Generate/export with CLI and install manually only in authorized test clients.</p>{% if error %}<p class="error">{{ error }}</p>{% endif %}{% if info %}<pre>{{ info }}</pre>{% else %}<p>No CA information available.</p>{% endif %}<pre>imr-proxy ca init --ca-dir ~/.imr-proxy/ca
-imr-proxy ca export --ca-dir ~/.imr-proxy/ca --output imr-proxy-ca.pem</pre>{% endblock %}
+{% extends "base.html" %}
+{% block title %}Certificate Authority{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-heading"><div><h3>Local CA workflow</h3><p>HTTPS interception is opt-in. imr-proxy never installs trust silently.</p></div></div>
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+  {% if info %}<pre class="codeblock">{{ info }}</pre>{% else %}<div class="empty">No CA information available for the configured CA directory.</div>{% endif %}
+  <div class="command-grid">
+    <code>imr-proxy ca init --ca-dir ~/.imr-proxy/ca</code>
+    <code>imr-proxy ca export --ca-dir ~/.imr-proxy/ca --output imr-proxy-ca.pem</code>
+  </div>
+</section>
+{% endblock %}

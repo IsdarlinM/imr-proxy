@@ -34,7 +34,7 @@ Use this tool only on systems you own or are explicitly authorized to test. Do n
 - Secret redaction by default.
 - Export to JSON, CSV, HAR, Markdown, and HTML.
 - Terminal live output with Rich.
-- Local FastAPI web UI.
+- Local FastAPI web UI with login portal and SQLite-backed console users.
 - Replay for safe methods by default.
 - SQLite session storage.
 - YAML/TOML config and `IMR_PROXY_` environment variables.
@@ -189,7 +189,39 @@ Important `start` flags: `--host`, `--port`, `--web`, `--no-web`, `--web-host`, 
 
 ## Web UI
 
-Includes dashboard, traffic table, flow detail, headers/cookies/body views, findings panel, certificate page, settings/about page, and JSON API endpoints.
+Includes a cyber-themed dashboard, traffic table, flow detail, headers/cookies/body views, findings panel, certificate page, settings/about page, users page, and authenticated JSON API endpoints.
+
+### Web console login
+
+Default first-run credentials are:
+
+```text
+admin:admin
+```
+
+These credentials are created only when the local SQLite user table is empty. They are intended for first-run local setup only. Change the password immediately after first login from the **Users** page or with the CLI:
+
+```bash
+imr-proxy users passwd admin --password "NewStrongPassword"
+```
+
+The Web UI and `/api/*` endpoints require a login cookie. Session cookies are `HttpOnly` and `SameSite=Lax`; the console is designed for localhost use by default. Do not bind the Web UI remotely unless you understand the risk and have changed default credentials.
+
+### Console user management
+
+Create users from the Web UI at `/users`, or from terminal:
+
+```bash
+imr-proxy users list
+imr-proxy users create analyst01 --password "ChangeMe123!"
+imr-proxy users create admin02 --admin --password "ChangeMe123!"
+imr-proxy users passwd analyst01 --password "NewPass123!"
+imr-proxy users disable analyst01
+imr-proxy users enable analyst01
+imr-proxy users delete analyst01 --yes
+```
+
+If `--password` is omitted, the CLI prompts securely. User records and web sessions are stored in the configured SQLite database. Passwords are stored as PBKDF2-HMAC-SHA256 hashes with per-user random salts; plaintext passwords are never stored.
 
 ## Terminal mode
 

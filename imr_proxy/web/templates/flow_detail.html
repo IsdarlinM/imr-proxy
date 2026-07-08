@@ -1,1 +1,30 @@
-{% extends "base.html" %}{% block content %}{% if not flow %}<p>Flow not found.</p>{% else %}<h2>{{ flow.request.method }} {{ flow.request.url }}</h2><section class="card"><h3>Request headers</h3><pre>{{ flow.request.headers }}</pre><h3>Request body</h3><pre>{{ flow.request.body_text or '' }}</pre></section>{% if flow.response %}<section class="card"><h3>Response {{ flow.response.status_code }}</h3><pre>{{ flow.response.headers }}</pre><h3>Response body</h3><pre>{{ flow.response.body_text or '' }}</pre></section>{% endif %}<section class="card"><h3>Findings</h3>{% for x in flow.findings %}<article class="finding {{ x.severity }}"><h4>{{ x.severity|upper }} · {{ x.title }}</h4><p><code>{{ x.id }}</code></p><p><b>Evidence:</b> {{ x.evidence }}</p><p><b>Remediation:</b> {{ x.remediation }}</p></article>{% else %}<p>No findings.</p>{% endfor %}</section>{% endif %}{% endblock %}
+{% extends "base.html" %}
+{% block title %}Flow Detail{% endblock %}
+{% block content %}
+{% if not flow %}
+<section class="panel"><div class="empty">Flow not found.</div></section>
+{% else %}
+<section class="panel">
+  <div class="panel-heading"><div><h3>{{ flow.request.method }} {{ flow.request.url }}</h3><p>Captured request and response details with redaction applied.</p></div></div>
+  <div class="detail-grid">
+    <article><h4>Request headers</h4><pre class="codeblock">{{ flow.request.headers }}</pre></article>
+    <article><h4>Request body</h4><pre class="codeblock">{{ flow.request.body_text or '' }}</pre></article>
+  </div>
+</section>
+{% if flow.response %}
+<section class="panel">
+  <div class="panel-heading"><div><h3>Response {{ flow.response.status_code }}</h3></div></div>
+  <div class="detail-grid">
+    <article><h4>Response headers</h4><pre class="codeblock">{{ flow.response.headers }}</pre></article>
+    <article><h4>Response body</h4><pre class="codeblock">{{ flow.response.body_text or '' }}</pre></article>
+  </div>
+</section>
+{% endif %}
+<section class="panel">
+  <div class="panel-heading"><div><h3>Findings</h3><p>Defensive observations only; validate safely before assigning severity.</p></div></div>
+  {% for x in flow.findings %}
+    <article class="finding-card sev-border-{{ x.severity }}"><h4>{{ x.severity|upper }} · {{ x.title }}</h4><p><code>{{ x.id }}</code></p><p><b>Evidence:</b> {{ x.evidence }}</p><p><b>Remediation:</b> {{ x.remediation }}</p></article>
+  {% else %}<div class="empty">No findings.</div>{% endfor %}
+</section>
+{% endif %}
+{% endblock %}

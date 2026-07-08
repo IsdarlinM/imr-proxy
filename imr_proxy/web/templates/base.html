@@ -1,1 +1,54 @@
-<!doctype html><html><head><meta charset="utf-8"><title>imr-proxy</title><link rel="stylesheet" href="/static/style.css"></head><body><header><h1>IMR-PROXY</h1><p>Defensive HTTP/HTTPS Inspection Proxy · Version {{ version }}</p><nav><a href="/">Dashboard</a><a href="/certificates">Certificates</a><a href="/settings">Settings</a><a href="/api/flows">API</a></nav></header><main>{% block content %}{% endblock %}</main><script src="/static/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>imr-proxy · Console</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">IMR</div>
+        <div>
+          <h1>IMR-PROXY</h1>
+          <p>Defensive HTTP/HTTPS Inspection</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/certificates" class="nav-link">Certificates</a>
+        <a href="/settings" class="nav-link">Settings</a>
+        <a href="/users" class="nav-link">Users</a>
+        <a href="/api/flows" class="nav-link">API</a>
+      </nav>
+      <div class="sidebar-card">
+        <span class="status-dot"></span>
+        <span>Console online</span>
+        <small>Version {{ version }}</small>
+      </div>
+    </aside>
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Authorized local security console</p>
+          <h2>{% block title %}Dashboard{% endblock %}</h2>
+        </div>
+        <div class="userbox">
+          {% if user %}
+            <span class="avatar">{{ user.username[:1]|upper }}</span>
+            <div><b>{{ user.username }}</b><small>{% if user.is_admin %}Administrator{% else %}Analyst{% endif %}</small></div>
+            <a class="button ghost" href="/logout">Logout</a>
+          {% endif %}
+        </div>
+      </header>
+      {% if user and user.must_change_password %}
+        <div class="banner warning">Default credentials are active for this account. Change the password from Users or CLI before exposing the console to other users.</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -11,11 +11,12 @@ from imr_proxy.proxy.engine import run_proxy
 from imr_proxy.reporting.exporters import export_flows
 from imr_proxy.storage.database import connect, init_db
 from imr_proxy.storage.repositories import FlowRepository, SessionRepository
+from imr_proxy.web.auth import AuthError, UserRepository
 from imr_proxy.terminal.tables import sessions_table
 from imr_proxy.version import get_version
 app=typer.Typer(invoke_without_command=True, no_args_is_help=True, help="imr-proxy defensive HTTP/HTTPS inspection proxy")
-ca_app=typer.Typer(help="Local CA lifecycle commands"); config_app=typer.Typer(help="Configuration commands"); sessions_app=typer.Typer(help="Session commands"); rules_app=typer.Typer(help="Rule testing commands")
-app.add_typer(ca_app,name="ca"); app.add_typer(config_app,name="config"); app.add_typer(sessions_app,name="sessions"); app.add_typer(rules_app,name="rules")
+ca_app=typer.Typer(help="Local CA lifecycle commands"); config_app=typer.Typer(help="Configuration commands"); sessions_app=typer.Typer(help="Session commands"); rules_app=typer.Typer(help="Rule testing commands"); users_app=typer.Typer(help="Web console user commands")
+app.add_typer(ca_app,name="ca"); app.add_typer(config_app,name="config"); app.add_typer(sessions_app,name="sessions"); app.add_typer(rules_app,name="rules"); app.add_typer(users_app,name="users")
 console=Console()
 @app.callback()
 def callback(version: Annotated[bool, typer.Option("--version", help="Show version and exit.")]=False):
@@ -52,6 +53,8 @@ def config_show(path: Annotated[Optional[Path], typer.Option("--config")]=None):
     cfg=build_config(path); console.print_json(cfg.model_dump_json(indent=2)); console.print(f"Default config path: {default_config_path()}")
 def _repos(storage: Optional[Path]):
     cfg=build_config(overrides={"storage":storage} if storage else None); conn=connect(cfg.storage); init_db(conn); return SessionRepository(conn), FlowRepository(conn)
+def _user_repo(storage: Optional[Path]):
+    cfg=build_config(overrides={"storage":storage} if storage else None); conn=connect(cfg.storage); init_db(conn); return UserRepository(conn)
 @sessions_app.command("list")
 def sessions_list(storage: Annotated[Optional[Path], typer.Option("--storage")]=None):
     s,_=_repos(storage); console.print(sessions_table(s.list()))
@@ -75,4 +78,54 @@ def replay(flow_id: str, allow_unsafe: Annotated[bool, typer.Option("--allow-uns
 def rules_test(url: str, scope: Annotated[Optional[list[str]], typer.Option("--scope")]=None, exclude: Annotated[Optional[list[str]], typer.Option("--exclude")]=None):
     from imr_proxy.proxy.scope import ScopeMatcher
     console.print_json(json.dumps({"url":url,"in_scope":ScopeMatcher(scope or [], exclude or []).in_scope(url)}))
+
+@users_app.command("list")
+def users_list(storage: Annotated[Optional[Path], typer.Option("--storage")]=None):
+    repo=_user_repo(storage)
+    rows=repo.list_users()
+    if not rows:
+        console.print("No users found."); return
+    from rich.table import Table
+    table=Table(title="imr-proxy Web Console Users")
+    table.add_column("Username"); table.add_column("Role"); table.add_column("Status"); table.add_column("Must Change"); table.add_column("Last Login")
+    for u in rows:
+        table.add_row(u["username"], "admin" if u["is_admin"] else "analyst", "active" if u["is_active"] else "disabled", "yes" if u["must_change_password"] else "no", u["last_login_at"] or "-")
+    console.print(table)
+@users_app.command("create")
+def users_create(username: str, password: Annotated[Optional[str], typer.Option("--password", help="Password. If omitted, it is prompted securely.")]=None, admin: Annotated[bool, typer.Option("--admin/--no-admin")]=False, must_change: Annotated[bool, typer.Option("--must-change/--no-must-change")]=False, storage: Annotated[Optional[Path], typer.Option("--storage")]=None):
+    repo=_user_repo(storage)
+    if password is None:
+        password=typer.prompt("Password", hide_input=True, confirmation_prompt=True)
+    try:
+        repo.create_user(username,password,is_admin=admin,must_change_password=must_change,created_by="cli")
+    except AuthError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    console.print(f"[green]Created user:[/green] {username.strip().lower()}")
+@users_app.command("passwd")
+def users_passwd(username: str, password: Annotated[Optional[str], typer.Option("--password", help="New password. If omitted, it is prompted securely.")]=None, must_change: Annotated[bool, typer.Option("--must-change/--no-must-change")]=False, storage: Annotated[Optional[Path], typer.Option("--storage")]=None):
+    repo=_user_repo(storage)
+    if password is None:
+        password=typer.prompt("New password", hide_input=True, confirmation_prompt=True)
+    try:
+        repo.set_password(username,password,must_change_password=must_change)
+    except AuthError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    console.print(f"[green]Password updated for:[/green] {username.strip().lower()}")
+@users_app.command("enable")
+def users_enable(username: str, storage: Annotated[Optional[Path], typer.Option("--storage")]=None):
+    try: _user_repo(storage).set_active(username, True)
+    except AuthError as exc: raise typer.BadParameter(str(exc)) from exc
+    console.print(f"[green]Enabled user:[/green] {username.strip().lower()}")
+@users_app.command("disable")
+def users_disable(username: str, storage: Annotated[Optional[Path], typer.Option("--storage")]=None):
+    try: _user_repo(storage).set_active(username, False)
+    except AuthError as exc: raise typer.BadParameter(str(exc)) from exc
+    console.print(f"[yellow]Disabled user:[/yellow] {username.strip().lower()}")
+@users_app.command("delete")
+def users_delete(username: str, yes: Annotated[bool, typer.Option("--yes")]=False, storage: Annotated[Optional[Path], typer.Option("--storage")]=None):
+    if not yes and not typer.confirm(f"Delete user {username}?", default=False):
+        raise typer.Abort()
+    try: _user_repo(storage).delete_user(username)
+    except AuthError as exc: raise typer.BadParameter(str(exc)) from exc
+    console.print(f"[red]Deleted user:[/red] {username.strip().lower()}")
 def main(): app()
