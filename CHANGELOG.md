@@ -2,13 +2,28 @@
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
-## [0.1.6] - 2026-07-08
+## [0.1.8] - 2026-07-08
 
 ### Fixed
-- Fixed mitmproxy startup failure in default TLS passthrough mode by omitting the `confdir` option when no local CA directory is required.
-- Added regression tests to ensure `confdir` is only passed to mitmproxy as a string.
-- Documented reinstall steps for Windows launchers that still point to an older checkout.
-- Disabled uvicorn ANSI-colored logs to avoid raw escape sequences in Windows CMD/PowerShell output.
+- Fixed Linux test parity by removing the pytest async plugin dependency from the mitmproxy engine regression test.
+- Fixed Linux installer command exposure by creating a user launcher at `~/.local/bin/imr-proxy`.
+- Fixed Web UI dashboard endpoint display so custom proxy/web ports are shown instead of hardcoded defaults.
+
+### Changed
+- Linux installer now checks that `.venv/bin/imr-proxy` exists before reporting success.
+- Linux installer now warns when the launcher directory is not in `PATH` and prints the exact export command.
+
+## [0.1.7] - 2026-07-08
+
+### Fixed
+- Fixed Web UI 500 errors on FastAPI/Starlette by using the current `TemplateResponse(request, name, context)` call style.
+- Added a no-content `/favicon.ico` route to avoid noisy 404 logs in browsers.
+- Added regression tests for Web UI pages and API endpoints.
+- Added broader smoke tests for CLI, SQLite storage, CA lifecycle, and the mitmproxy engine wrapper with a mocked mitmproxy runtime.
+
+### Changed
+- Documented that `127.0.0.1:7413` is the forward-proxy endpoint and must be configured as browser/system proxy, while `127.0.0.1:7414` is the Web UI.
+- Added clearer startup guidance so direct browsing to the proxy port is not confused with the Web UI.
 
 ## [0.1.5] - 2026-07-08
 

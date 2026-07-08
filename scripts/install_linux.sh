@@ -8,10 +8,13 @@ PYTHON_SOURCE_URL="${PYTHON_SOURCE_URL:-https://www.python.org/ftp/python/${PYTH
 PYTHON_INSTALL_PREFIX="${PYTHON_INSTALL_PREFIX:-$HOME/.local/imr-proxy/python-${PYTHON_SOURCE_VERSION}}"
 ASSUME_YES="${IMR_PROXY_ASSUME_YES:-0}"
 PYTHON_BIN="${PYTHON_BIN:-}"
+USER_BIN="${IMR_PROXY_USER_BIN:-$HOME/.local/bin}"
 DETECTED_PYTHON=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 VENV_DIR="$PROJECT_ROOT/.venv"
+COMMAND_PATH="$VENV_DIR/bin/imr-proxy"
+LAUNCHER_PATH="$USER_BIN/imr-proxy"
 
 log() { printf '[*] %s\n' "$*" >&2; }
 warn() { printf '[!] %s\n' "$*" >&2; }
@@ -43,12 +46,12 @@ find_python() {
     if [[ -n "$PYTHON_BIN" ]]; then
         candidates+=("$PYTHON_BIN")
     fi
-    candidates+=(python3.11 python3 python)
+    candidates+=(python3.13 python3.12 python3.11 python3 python)
 
-    local candidate
+    local candidate resolved
     for candidate in "${candidates[@]}"; do
-        if command -v "$candidate" >/dev/null 2>&1 && is_python_compatible "$candidate"; then
-            command -v "$candidate"
+        if resolved="$(command -v "$candidate" 2>/dev/null)" && is_python_compatible "$resolved"; then
+            printf '%s\n' "$resolved"
             return 0
         fi
     done
@@ -169,6 +172,27 @@ ensure_python() {
     fail "Python 3.11+ still was not found after installation. Open a new shell or set PYTHON_BIN explicitly."
 }
 
+create_launcher() {
+    mkdir -p "$USER_BIN"
+    cat > "$LAUNCHER_PATH" <<EOF
+#!/usr/bin/env sh
+exec "$COMMAND_PATH" "\$@"
+EOF
+    chmod 0755 "$LAUNCHER_PATH"
+    log "Global launcher created at: $LAUNCHER_PATH"
+
+    case ":$PATH:" in
+        *":$USER_BIN:"*)
+            return 0
+            ;;
+    esac
+
+    warn "$USER_BIN is not currently in PATH."
+    warn "You can run imr-proxy directly with: '$LAUNCHER_PATH' --version"
+    warn "To make it available in future shells, add this line to ~/.profile, ~/.bashrc, or ~/.zshrc:"
+    warn "export PATH=\"$USER_BIN:\$PATH\""
+}
+
 main() {
     log "Installing imr-proxy"
     log "Project root: $PROJECT_ROOT"
@@ -188,10 +212,14 @@ main() {
         cd "$PROJECT_ROOT"
         "$VENV_DIR/bin/python" -m pip install -e .
     )
+
+    [[ -x "$COMMAND_PATH" ]] || fail "Installation finished but command was not created at $COMMAND_PATH"
+    create_launcher
+
     log "Installed successfully."
     log "Activate it with: cd '$PROJECT_ROOT' && source .venv/bin/activate"
     log "Check version with: imr-proxy --version"
-    log "Direct command without activation: '$VENV_DIR/bin/imr-proxy' --version"
+    log "Direct command without activation: '$COMMAND_PATH' --version"
 }
 
 main "$@"

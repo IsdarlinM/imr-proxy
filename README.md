@@ -8,7 +8,7 @@
 ██║██║ ╚═╝ ██║██║  ██║      ██║     ██║  ██║╚██████╔╝██╔╝ ██╗   ██║
 ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 Defensive HTTP/HTTPS Inspection Proxy
-Version: 0.1.6
+Version: 0.1.8
 ```
 
 imr-proxy is a professional defensive HTTP/HTTPS inspection proxy for authorized security assessments, internal audits, QA testing, developer debugging, lab environments, and bug bounty scopes.
@@ -54,7 +54,13 @@ cd imr-proxy
 bash scripts/install_linux.sh
 ```
 
-The Linux installer checks for Python 3.11+. If a compatible interpreter is missing, it asks before installing anything. After confirmation, it first tries the detected package manager (`apt`, `dnf`, `yum`, `pacman`, or `zypper`). If that is not available or not suitable, it can download and build Python 3.11.15 from the official python.org source release into `~/.local/imr-proxy/python-3.11.15`. It never installs Python silently. The installer resolves the project root from the script location, so it works from either the project root or the `scripts/` directory, and creates the virtual environment at `<project-root>/.venv`.
+The Linux installer checks for Python 3.11+. If a compatible interpreter is missing, it asks before installing anything. After confirmation, it first tries the detected package manager (`apt`, `dnf`, `yum`, `pacman`, or `zypper`). If that is not available or not suitable, it can download and build Python 3.11.15 from the official python.org source release into `~/.local/imr-proxy/python-3.11.15`. It never installs Python silently. The installer resolves the project root from the script location, so it works from either the project root or the `scripts/` directory, creates the virtual environment at `<project-root>/.venv`, and creates a launcher at `~/.local/bin/imr-proxy`.
+
+If `~/.local/bin` is not in your `PATH`, the installer prints the exact line to add to `~/.profile`, `~/.bashrc`, or `~/.zshrc`. You can always run the launcher directly:
+
+```bash
+~/.local/bin/imr-proxy --version
+```
 
 Useful installer overrides:
 
@@ -62,6 +68,7 @@ Useful installer overrides:
 PYTHON_BIN=/path/to/python3.11 bash scripts/install_linux.sh
 IMR_PROXY_ASSUME_YES=1 bash scripts/install_linux.sh
 PYTHON_INSTALL_PREFIX="$HOME/.local/imr-proxy/python-3.11.15" bash scripts/install_linux.sh
+IMR_PROXY_USER_BIN="$HOME/bin" bash scripts/install_linux.sh
 ```
 
 Manual:
@@ -119,7 +126,7 @@ python -m pip install -e .
 imr-proxy --version
 ```
 
-If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.6 because the correct environment is `<project-root>\.venv`.
+If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.8 because the correct environment is `<project-root>\.venv`.
 
 ## Quick start
 
@@ -132,6 +139,8 @@ Browser proxy:
 - HTTP proxy: `127.0.0.1:7413`
 - HTTPS proxy: `127.0.0.1:7413`
 - Web UI: `http://127.0.0.1:7414`
+
+Important: `127.0.0.1:7413` is a forward-proxy listener, not a web page. Do not open `http://127.0.0.1:7413/` directly in the browser expecting a UI. Configure the browser or OS proxy settings to use `127.0.0.1:7413`, then browse the target site normally. Open the dashboard at `http://127.0.0.1:7414/`.
 
 ## HTTPS interception and local CA
 
@@ -214,6 +223,16 @@ Redacted by default: Authorization, Cookie, Set-Cookie, API keys, tokens, passwo
 
 ## Troubleshooting
 
+### Web UI returns 500 on `/`
+
+Version 0.1.8 fixes Web UI crashes caused by Starlette/FastAPI template rendering API changes. Reinstall from the new project root and verify `imr-proxy --version` returns `0.1.8`.
+
+Version 0.1.8 also fixes Linux test/development parity by removing the pytest async plugin requirement from the engine test and by creating a Linux user launcher at `~/.local/bin/imr-proxy`.
+
+### Direct browser access to `127.0.0.1:7413` shows mitmproxy destination errors
+
+This is expected for a forward proxy. Port `7413` receives proxy traffic from a configured client. It is not the dashboard. Use `http://127.0.0.1:7414/` for the Web UI and configure the browser proxy as HTTP/HTTPS `127.0.0.1:7413`.
+
 ### Windows launcher still shows an old version
 
 If `%USERPROFILE%\.imr-proxy\bin\imr-proxy.cmd` starts an older checkout, reinstall from the new project root:
@@ -227,7 +246,7 @@ The installer rewrites the user launcher so it points to the current project `.v
 
 ### mitmproxy `confdir` TypeError on startup
 
-Version 0.1.6 fixes startup failures like `TypeError: Expected <class 'str'> for confdir, but got <class 'NoneType'>`. The proxy now omits `confdir` unless HTTPS interception/local CA mode actually needs a custom CA directory.
+Version 0.1.8 fixes startup failures like `TypeError: Expected <class 'str'> for confdir, but got <class 'NoneType'>`. The proxy now omits `confdir` unless HTTPS interception/local CA mode actually needs a custom CA directory.
 
 - TLS errors: export and manually trust the local CA in the authorized test client.
 - No HTTPS body visibility: enable `--intercept-https`, use `--cert-mode local-ca`, and trust the CA.

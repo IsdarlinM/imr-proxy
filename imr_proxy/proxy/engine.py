@@ -47,6 +47,7 @@ async def _run_mitmproxy(config, flow_repo, session_id, terminal):
     master=DumpMaster(opts, with_termlog=False, with_dumper=False)
     master.addons.add(ImrProxyAddon(config, flow_repo, session_id, terminal))
     log.info("Proxy listening on %s:%s", config.host, config.port)
+    log.info("Use %s:%s as the browser/system HTTP(S) proxy; open the Web UI at http://%s:%s", config.host, config.port, config.web_host, config.web_port)
     try: await master.run()
     finally: master.shutdown()
 def run_proxy(config: AppConfig)->None:
