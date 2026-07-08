@@ -8,7 +8,7 @@
 ██║██║ ╚═╝ ██║██║  ██║      ██║     ██║  ██║╚██████╔╝██╔╝ ██╗   ██║
 ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 Defensive HTTP/HTTPS Inspection Proxy
-Version: 0.1.2
+Version: 0.1.4
 ```
 
 imr-proxy is a professional defensive HTTP/HTTPS inspection proxy for authorized security assessments, internal audits, QA testing, developer debugging, lab environments, and bug bounty scopes.
@@ -74,34 +74,54 @@ imr-proxy --version
 
 ## Installation on Windows
 
-```powershell
+Recommended installer for Windows is now **CMD**, not PowerShell. This avoids PowerShell `ExecutionPolicy` blocks.
+
+```bat
 git clone <repo> imr-proxy
 cd imr-proxy
+scripts\install_windows.cmd
+```
+
+The Windows CMD installer checks for Python 3.11+ using the Python launcher and common `python` commands. If Python 3.11+ is missing, it asks before downloading and running the official Python 3.11.9 64-bit installer from python.org. Python.org marks 3.11.9 as the last full 3.11 bugfix release with Windows binary installers; newer 3.11 security releases are source-only. The installer resolves the project root from the script location, so it works from either the project root or the `scripts\` directory, and creates the virtual environment at `<project-root>\.venv`.
+
+Useful CMD installer options:
+
+```bat
+scripts\install_windows.cmd /PYTHON "C:\Path\To\Python311\python.exe"
+scripts\install_windows.cmd /Y
+scripts\install_windows.cmd /PYTHONURL "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
+```
+
+The CMD installer also creates a user launcher at:
+
+```text
+%USERPROFILE%\.imr-proxy\bin\imr-proxy.cmd
+```
+
+It asks before adding that folder to your user `PATH`. After PATH is updated, open a new CMD window and run:
+
+```bat
+imr-proxy --version
+```
+
+PowerShell installer is still included as optional legacy support:
+
+```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1
 ```
 
-The Windows installer checks for Python 3.11+ using the Python launcher and common `python` commands. If Python 3.11+ is missing, it asks before downloading and running the official Python 3.11.9 64-bit installer from python.org. Python.org marks 3.11.9 as the last full 3.11 bugfix release with Windows binary installers; newer 3.11 security releases are source-only. The script does not change PowerShell execution policy. The installer resolves the project root from the script location, so it works from either the project root or the `scripts/` directory, and creates the virtual environment at `<project-root>\.venv`.
+Manual CMD install:
 
-Useful installer options:
-
-```powershell
-.\scripts\install_windows.ps1 -Python "C:\Path\To\Python311\python.exe"
-.\scripts\install_windows.ps1 -AssumeYes
-.\scripts\install_windows.ps1 -PythonInstallerUrl "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
-```
-
-Manual:
-
-```powershell
+```bat
 cd C:\Path\To\imr-proxy
 py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.venv\Scripts\activate.bat
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e .
 imr-proxy --version
 ```
 
-If you previously ran version 0.1.1 from `scripts/`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.2 because the correct environment is `<project-root>\.venv`.
+If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.4 because the correct environment is `<project-root>\.venv`.
 
 ## Quick start
 

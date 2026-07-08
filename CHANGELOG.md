@@ -2,6 +2,24 @@
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.1.4] - 2026-07-08
+
+### Fixed
+- Fixed Windows editable installation failing with `Multiple top-level packages discovered in a flat-layout: ['configs', 'imr_proxy']`.
+- Explicitly configured setuptools package discovery to include only `imr_proxy*` and exclude non-package directories.
+- Updated project license metadata from the deprecated TOML table form to SPDX string `MIT`.
+
+## [0.1.3] - 2026-07-08
+
+### Added
+- Added `scripts/install_windows.cmd` as the recommended Windows installer to avoid PowerShell Execution Policy issues.
+- Added a Windows CMD user launcher at `%USERPROFILE%\.imr-proxy\bin\imr-proxy.cmd`.
+- Added optional user PATH registration from the CMD installer, with confirmation before modifying PATH.
+
+### Changed
+- README now recommends CMD installation on Windows and keeps PowerShell only as optional legacy support.
+
+
 ## [0.1.2] - 2026-07-07
 
 ### Fixed
