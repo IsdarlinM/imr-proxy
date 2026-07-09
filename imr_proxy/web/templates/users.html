@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Console Users{% endblock %}
+{% block content %}
+<section class="metric-grid two">
+  <article class="metric-card"><span>Console users</span><strong>{{ users|length }}</strong><small>Stored in local SQLite</small></article>
+  <article class="metric-card"><span>Default access</span><strong>admin</strong><small>Change password after first login</small></article>
+</section>
+{% if message %}<div class="alert success">{{ message }}</div>{% endif %}
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+<section class="panel split-panel">
+  <div>
+    <div class="panel-heading"><div><h3>Create user</h3><p>Add analysts or administrators with access to the proxy console.</p></div></div>
+    <form class="form-grid" method="post" action="/users/create">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Username<input name="username" required placeholder="analyst01"></label>
+      <label>Password<input name="password" type="password" required placeholder="Minimum 5 characters"></label>
+      <label class="check"><input type="checkbox" name="is_admin"> Administrator</label>
+      <label class="check"><input type="checkbox" name="must_change_password" checked> Require password change note</label>
+      <button class="button primary" type="submit">Create user</button>
+    </form>
+  </div>
+  <div>
+    <div class="panel-heading"><div><h3>Reset password</h3><p>Administrative password reset for existing users.</p></div></div>
+    <form class="form-grid" method="post" action="/users/password">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Username<input name="username" required placeholder="username"></label>
+      <label>New password<input name="password" type="password" required placeholder="New password"></label>
+      <label class="check"><input type="checkbox" name="must_change_password" checked> Require password change note</label>
+      <button class="button" type="submit">Update password</button>
+    </form>
+  </div>
+</section>
+<section class="panel">
+  <div class="panel-heading"><div><h3>User database</h3><p>Local users authorized to access the Web UI and API.</p></div></div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Must change</th><th>Last login</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td><b>{{ u.username }}</b></td>
+          <td>{% if u.is_admin %}Admin{% else %}Analyst{% endif %}</td>
+          <td><span class="pill {% if u.is_active %}sev-low{% else %}sev-high{% endif %}">{% if u.is_active %}active{% else %}disabled{% endif %}</span></td>
+          <td>{{ 'yes' if u.must_change_password else 'no' }}</td>
+          <td>{{ u.last_login_at or '-' }}</td>
+          <td>
+            {% if u.username != 'admin' %}
+            <form method="post" action="/users/toggle" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="username" value="{{ u.username }}">
+              <input type="hidden" name="active" value="{{ 0 if u.is_active else 1 }}">
+              <button class="button ghost" type="submit">{{ 'Disable' if u.is_active else 'Enable' }}</button>
+            </form>
+            {% else %}<span class="muted">Protected</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

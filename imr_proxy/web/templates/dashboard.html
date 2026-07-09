@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Traffic Dashboard{% endblock %}
+{% block content %}
+<section class="metric-grid">
+  <article class="metric-card"><span>Recent flows</span><strong>{{ stats.total_flows }}</strong><small>Last 100 stored records</small></article>
+  <article class="metric-card"><span>High risk</span><strong>{{ stats.high_risk }}</strong><small>Critical/high findings</small></article>
+  <article class="metric-card"><span>Proxy endpoint</span><strong>{{ stats.proxied_host }}</strong><small>Configure browser/system proxy here</small></article>
+  <article class="metric-card"><span>Web UI</span><strong>{{ stats.web_host }}</strong><small>Management console only</small></article>
+</section>
+<section class="panel">
+  <div class="panel-heading">
+    <div><h3>Live traffic</h3><p>Search captured requests, status codes, duration, hosts, and risk tags.</p></div>
+    <input id="filter" class="search" placeholder="Filter traffic, URL, status, severity...">
+  </div>
+  <div class="table-wrap">
+    <table id="flows" class="data-table">
+      <thead><tr><th>Time</th><th>Method</th><th>URL</th><th>Status</th><th>Duration</th><th>Severity</th></tr></thead>
+      <tbody>
+      {% for f in flows %}
+        <tr>
+          <td class="nowrap">{{ f.started_at }}</td>
+          <td><span class="method">{{ f.method }}</span></td>
+          <td class="url"><a href="/flows/{{ f.id }}">{{ f.url }}</a></td>
+          <td>{{ f.status_code or '' }}</td>
+          <td>{{ "%.1f"|format(f.duration_ms or 0) }} ms</td>
+          <td><span class="pill sev-{{ f.highest_severity or 'info' }}">{{ f.highest_severity or 'info' }}</span></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="empty">No traffic captured yet. Configure your browser proxy to {{ stats.proxied_host }}.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

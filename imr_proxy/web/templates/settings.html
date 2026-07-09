@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Configuration{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-heading"><div><h3>Runtime settings</h3><p>Resolved configuration after config file, environment, and CLI overrides.</p></div></div>
+  <pre class="codeblock">{{ config.model_dump_json(indent=2) }}</pre>
+</section>
+{% endblock %}

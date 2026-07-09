@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>imr-proxy · Login</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-body">
+  <main class="login-panel">
+    <div class="login-brand">
+      <div class="brand-mark large">IMR</div>
+      <h1>IMR-PROXY</h1>
+      <p>Defensive HTTP/HTTPS Inspection Proxy</p>
+      <span>Version {{ version }}</span>
+    </div>
+    <form class="login-card" method="post" action="/login" autocomplete="off">
+      <h2>Console Login</h2>
+      <p>Use only in authorized labs, audits, QA environments, and defensive validation.</p>
+      {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <label>Username<input name="username" placeholder="admin" autofocus required></label>
+      <label>Password<input name="password" type="password" placeholder="••••••••" required></label>
+      <button class="button primary" type="submit">Access console</button>
+      <small>Default first-run credentials: <code>admin:admin</code>. Change them immediately after first login.</small>
+    </form>
+  </main>
+</body>
+</html>
