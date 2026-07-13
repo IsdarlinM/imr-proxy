@@ -42,6 +42,7 @@
   const activeFilters = document.getElementById("active-filters");
   const trafficError = document.getElementById("traffic-error");
   const liveIndicator = document.getElementById("live-indicator");
+  const liveStatusText = document.getElementById("live-status-text");
   const toggleLive = document.getElementById("toggle-live");
   const refreshNow = document.getElementById("refresh-now");
   const resetFilters = document.getElementById("reset-filters");
@@ -54,12 +55,19 @@
     loading: false,
     offset: 0,
     total: 0,
-    timer: null,
-    requestController: null,
+    socket: null,
+    socketConnected: false,
+    reconnectTimer: null,
+    reconnectAttempts: 0,
+    fallbackTimer: null,
+    refreshTimer: null,
+    refreshQueued: false,
+    lastRevision: null,
   };
 
-  const pollingIntervalMs = 1500;
-  const persistedKey = "imr-proxy-traffic-filters-v1";
+  const fallbackPollingIntervalMs = 3000;
+  const realtimeRefreshDebounceMs = 80;
+  const persistedKey = "imr-proxy-traffic-filters-v2";
 
   function text(value) {
     return value === null || value === undefined || value === "" ? "—" : String(value);
@@ -69,7 +77,12 @@
     if (!value) return "—";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return date.toLocaleTimeString([], {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
   }
 
   function formatDuration(value) {
@@ -199,7 +212,7 @@
     try {
       localStorage.setItem(persistedKey, JSON.stringify(rawFormValues()));
     } catch (_) {
-      // Storage can be disabled by the browser. Filtering still works.
+      // Local storage may be disabled. Filtering still works.
     }
   }
 
@@ -262,10 +275,15 @@
     trafficError.textContent = message || "";
   }
 
-  async function loadStats(signal) {
-    const response = await fetch("/api/traffic/stats", { headers: { Accept: "application/json" }, signal });
-    if (!response.ok) throw new Error(`Stats request failed (${response.status})`);
-    const stats = await response.json();
+  function setLiveStatus(mode, label) {
+    ["active", "paused", "degraded", "connecting"].forEach((name) => {
+      liveIndicator.classList.toggle(name, name === mode);
+    });
+    liveStatusText.textContent = label;
+  }
+
+  function applyStats(stats) {
+    if (!stats) return;
     const mapping = {
       "metric-total": stats.total,
       "metric-high-risk": stats.high_risk,
@@ -279,21 +297,49 @@
     });
   }
 
+  async function loadStats() {
+    const response = await fetch("/api/traffic/stats", {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (response.status === 401) {
+      window.location.assign("/login?next=/");
+      throw new Error("Session expired");
+    }
+    if (!response.ok) throw new Error(`Stats request failed (${response.status})`);
+    applyStats(await response.json());
+  }
+
   async function loadTraffic() {
-    if (state.requestController) state.requestController.abort();
-    const controller = new AbortController();
-    state.requestController = controller;
+    if (state.loading) {
+      state.refreshQueued = true;
+      return;
+    }
+
     setLoading(true);
     showError("");
     const params = buildQuery();
+    const requestQuery = params.toString();
     try {
-      const response = await fetch(`/api/flows?${params.toString()}`, {
-        headers: { Accept: "application/json" },
-        signal: controller.signal,
-      });
-      loadStats(controller.signal).catch(() => {});
+      const [response] = await Promise.all([
+        fetch(`/api/flows?${requestQuery}`, {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        }),
+        loadStats().catch(() => null),
+      ]);
+      if (response.status === 401) {
+        window.location.assign("/login?next=/");
+        return;
+      }
       if (!response.ok) throw new Error(`Traffic request failed (${response.status})`);
       const payload = await response.json();
+
+      if (requestQuery !== buildQuery().toString()) {
+        state.refreshQueued = true;
+        return;
+      }
+
       renderRows(payload.items || []);
       state.total = Number(payload.total || 0);
       const limit = Number(payload.limit || params.get("limit") || 250);
@@ -301,19 +347,22 @@
       lastUpdated.textContent = `Updated ${new Date(payload.generated_at || Date.now()).toLocaleTimeString()}`;
       updatePagination(limit);
     } catch (error) {
-      if (error && error.name === "AbortError") return;
       showError(error instanceof Error ? error.message : "Unable to refresh traffic.");
-      liveIndicator.classList.add("degraded");
+      if (!state.socketConnected) setLiveStatus("degraded", "Fallback");
     } finally {
-      if (state.requestController === controller) setLoading(false);
+      setLoading(false);
+      if (state.refreshQueued) {
+        state.refreshQueued = false;
+        queueMicrotask(loadTraffic);
+      }
     }
   }
 
   async function loadOptions() {
     try {
       const [optionsResponse, sessionsResponse] = await Promise.all([
-        fetch("/api/flows/options", { headers: { Accept: "application/json" } }),
-        fetch("/api/sessions", { headers: { Accept: "application/json" } }),
+        fetch("/api/flows/options", { headers: { Accept: "application/json" }, cache: "no-store" }),
+        fetch("/api/sessions", { headers: { Accept: "application/json" }, cache: "no-store" }),
       ]);
       if (optionsResponse.ok) {
         const options = await optionsResponse.json();
@@ -343,28 +392,142 @@
           sessionSelect.value = current;
         }
       }
-      restoreFilters();
-      renderActiveFilters();
     } catch (_) {
-      // Optional filter suggestions must not break the console.
+      // Optional filter suggestions must not break the live console.
     }
   }
 
-  function schedulePolling() {
-    clearInterval(state.timer);
-    state.timer = setInterval(() => {
-      if (state.live && !document.hidden && state.offset === 0) loadTraffic();
-    }, pollingIntervalMs);
+  function websocketUrl() {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${window.location.host}/ws/traffic`;
+  }
+
+  function stopFallbackPolling() {
+    if (state.fallbackTimer) clearInterval(state.fallbackTimer);
+    state.fallbackTimer = null;
+  }
+
+  function startFallbackPolling() {
+    if (state.fallbackTimer || !state.live) return;
+    state.fallbackTimer = setInterval(() => {
+      if (state.live && !document.hidden && state.offset === 0 && !state.socketConnected) {
+        loadTraffic();
+      }
+    }, fallbackPollingIntervalMs);
+  }
+
+  function queueRealtimeRefresh() {
+    if (!state.live || state.offset !== 0) return;
+    if (state.refreshTimer) clearTimeout(state.refreshTimer);
+    state.refreshTimer = setTimeout(() => {
+      state.refreshTimer = null;
+      loadTraffic();
+    }, realtimeRefreshDebounceMs);
+  }
+
+  function scheduleReconnect() {
+    if (!state.live || state.reconnectTimer) return;
+    const delay = Math.min(10000, 750 * (2 ** state.reconnectAttempts));
+    state.reconnectAttempts += 1;
+    state.reconnectTimer = setTimeout(() => {
+      state.reconnectTimer = null;
+      connectTrafficStream();
+    }, delay);
+  }
+
+  function connectTrafficStream() {
+    if (!state.live) return;
+    if (!("WebSocket" in window)) {
+      setLiveStatus("degraded", "Polling fallback");
+      startFallbackPolling();
+      return;
+    }
+    if (state.socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(state.socket.readyState)) return;
+
+    setLiveStatus("connecting", "Connecting");
+    const socket = new WebSocket(websocketUrl());
+    state.socket = socket;
+
+    socket.addEventListener("open", () => {
+      if (state.socket !== socket) return;
+      state.socketConnected = true;
+      state.reconnectAttempts = 0;
+      stopFallbackPolling();
+      setLiveStatus("active", "Live");
+      showError("");
+    });
+
+    socket.addEventListener("message", (event) => {
+      if (state.socket !== socket) return;
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (_) {
+        return;
+      }
+      if (payload.revision !== undefined) state.lastRevision = payload.revision;
+      if (payload.type === "ready") {
+        setLiveStatus("active", "Live");
+        queueRealtimeRefresh();
+      } else if (payload.type === "traffic_changed") {
+        applyStats(payload.stats);
+        queueRealtimeRefresh();
+      } else if (payload.type === "heartbeat" || payload.type === "pong") {
+        setLiveStatus("active", "Live");
+      }
+    });
+
+    socket.addEventListener("error", () => {
+      if (socket.readyState === WebSocket.OPEN) socket.close(1011, "Transport error");
+    });
+
+    socket.addEventListener("close", (event) => {
+      if (state.socket !== socket) return;
+      state.socket = null;
+      state.socketConnected = false;
+      if (!state.live) return;
+      if (event.code === 4401) {
+        setLiveStatus("degraded", "Session expired");
+        showError("Your console session expired. Sign in again to resume live traffic.");
+        setTimeout(() => window.location.assign("/login?next=/"), 900);
+        return;
+      }
+      if (event.code === 4403) {
+        setLiveStatus("degraded", "Blocked");
+        showError("The live traffic connection was rejected by the origin policy.");
+        return;
+      }
+      setLiveStatus("degraded", "Reconnecting");
+      startFallbackPolling();
+      scheduleReconnect();
+    });
+  }
+
+  function disconnectTrafficStream() {
+    if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = null;
+    stopFallbackPolling();
+    if (state.socket) {
+      const socket = state.socket;
+      state.socket = null;
+      state.socketConnected = false;
+      if ([WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
+        socket.close(1000, "Live updates paused");
+      }
+    }
   }
 
   function setLive(live) {
     state.live = live;
     toggleLive.textContent = live ? "Pause live" : "Resume live";
-    liveIndicator.classList.toggle("active", live);
-    liveIndicator.classList.toggle("paused", !live);
-    liveIndicator.classList.remove("degraded");
-    liveIndicator.lastChild.textContent = live ? "Live" : "Paused";
-    if (live) loadTraffic();
+    if (!live) {
+      disconnectTrafficStream();
+      setLiveStatus("paused", "Paused");
+      return;
+    }
+    setLiveStatus("connecting", "Connecting");
+    loadTraffic();
+    connectTrafficStream();
   }
 
   let debounceTimer = null;
@@ -405,7 +568,11 @@
     document.getElementById("filter-limit").value = "250";
     document.getElementById("filter-order").value = "desc";
     state.offset = 0;
-    try { localStorage.removeItem(persistedKey); } catch (_) {}
+    try {
+      localStorage.removeItem(persistedKey);
+    } catch (_) {
+      // Ignore unavailable local storage.
+    }
     renderActiveFilters();
     loadTraffic();
   });
@@ -425,12 +592,23 @@
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && state.live) loadTraffic();
+    if (!document.hidden && state.live) {
+      loadTraffic();
+      connectTrafficStream();
+    }
   });
 
-  restoreFilters();
-  renderActiveFilters();
-  loadOptions();
-  loadTraffic();
-  schedulePolling();
+  window.addEventListener("beforeunload", disconnectTrafficStream);
+
+  async function initializeDashboard() {
+    restoreFilters();
+    renderActiveFilters();
+    await loadOptions();
+    restoreFilters();
+    renderActiveFilters();
+    await loadTraffic();
+    connectTrafficStream();
+  }
+
+  initializeDashboard();
 })();

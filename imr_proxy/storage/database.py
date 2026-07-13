@@ -47,6 +47,18 @@ def _ensure_flow_columns(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_event_state ON flows(event_type, state)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_severity ON flows(highest_severity)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_updated_at ON flows(updated_at DESC)")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS traffic_revision (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            revision INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO traffic_revision(id, revision, updated_at) VALUES (1, 0, CURRENT_TIMESTAMP)"
+    )
 
 
 def init_db(conn: sqlite3.Connection) -> None:

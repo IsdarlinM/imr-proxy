@@ -2,6 +2,19 @@
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.1.81] - 2026-07-13
+
+### Added
+- Added an authenticated same-origin WebSocket endpoint at `/ws/traffic` for real-time traffic change notifications.
+- Added a thread-safe in-process event bus that publishes committed flow revisions from the proxy thread directly to WebSocket subscribers.
+- Added automatic browser reconnection, connection-state indicators, event coalescing, and polling fallback when WebSockets are unavailable.
+- Added a persistent SQLite traffic revision counter so new flows and updates to existing flows are detected reliably.
+- Added regression tests for authentication, cross-origin rejection, new-flow notifications, and in-place flow updates.
+
+### Changed
+- Replaced browser polling as the primary live-update mechanism with WebSocket notifications while preserving all server-side filters and pagination.
+- Updated static asset cache keys and declared the `websockets` runtime dependency explicitly.
+
 ## [0.1.8] - 2026-07-08
 
 ### Added

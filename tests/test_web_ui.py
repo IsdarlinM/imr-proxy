@@ -113,7 +113,7 @@ def test_mobile_assets_and_responsive_markup(tmp_path):
     login_page = client.get("/login")
     assert login_page.status_code == 200
     assert "viewport-fit=cover" in login_page.text
-    assert "style.css?v=0.1.8-traffic-r2" in login_page.text
+    assert "style.css?v=0.1.81-realtime-r1" in login_page.text
 
     _login(client)
     dashboard = client.get("/")
@@ -125,7 +125,7 @@ def test_mobile_assets_and_responsive_markup(tmp_path):
     assert 'id="filter-event-type"' in dashboard.text
     assert 'id="filter-tls"' in dashboard.text
     assert 'id="toggle-live"' in dashboard.text
-    assert "app.js?v=0.1.8-traffic-r2" in dashboard.text
+    assert "app.js?v=0.1.81-realtime-r1" in dashboard.text
 
     stylesheet = client.get("/static/style.css")
     assert stylesheet.status_code == 200
@@ -139,5 +139,7 @@ def test_mobile_assets_and_responsive_markup(tmp_path):
     assert 'dataset.label' in javascript.text
     assert 'aria-current' in javascript.text
     assert '/api/flows?' in javascript.text
-    assert 'pollingIntervalMs' in javascript.text
+    assert 'new WebSocket' in javascript.text
+    assert '/ws/traffic' in javascript.text
+    assert 'fallbackPollingIntervalMs' in javascript.text
     assert 'replaceChildren' in javascript.text

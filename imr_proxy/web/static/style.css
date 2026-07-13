@@ -1134,6 +1134,18 @@ pre {
   background: var(--muted);
 }
 
+.live-indicator.connecting {
+  color: #b8f3ff;
+  border-color: rgba(34, 211, 238, 0.38);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.live-indicator.connecting i {
+  background: var(--cyan);
+  box-shadow: 0 0 12px var(--cyan);
+  animation: live-pulse 0.9s infinite;
+}
+
 .live-indicator.active {
   color: #b8ffd9;
   border-color: rgba(44, 255, 154, 0.38);

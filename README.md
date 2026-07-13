@@ -8,7 +8,7 @@
 ██║██║ ╚═╝ ██║██║  ██║      ██║     ██║  ██║╚██████╔╝██╔╝ ██╗   ██║
 ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 Defensive HTTP/HTTPS Inspection Proxy
-Version: 0.1.8
+Version: 0.1.81
 ```
 
 imr-proxy is a professional defensive HTTP/HTTPS inspection proxy for authorized security assessments, internal audits, QA testing, developer debugging, lab environments, and bug bounty scopes.
@@ -126,7 +126,7 @@ python -m pip install -e .
 imr-proxy --version
 ```
 
-If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.8 because the correct environment is `<project-root>\.venv`.
+If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.81 because the correct environment is `<project-root>\.venv`.
 
 ## Quick start
 
@@ -189,7 +189,7 @@ Important `start` flags: `--host`, `--port`, `--web`, `--no-web`, `--web-host`, 
 
 ## Web UI
 
-Includes a cyber-themed dashboard, live traffic table, flow detail, headers/cookies/body views, findings panel, certificate page, settings/about page, users page, and authenticated JSON API endpoints. The dashboard now polls for new lifecycle records, so pending requests, completed responses, failed requests, CONNECT tunnels, server connections, and WebSocket sessions appear without manually reloading the page.
+Includes a cyber-themed dashboard, live traffic table, flow detail, headers/cookies/body views, findings panel, certificate page, settings/about page, users page, and authenticated JSON API endpoints. The dashboard now uses an authenticated same-origin WebSocket stream, so pending requests, completed responses, failed requests, CONNECT tunnels, server connections, and WebSocket sessions appear in real time without manually reloading the page. A slower polling fallback is enabled only when WebSockets are unavailable or reconnecting.
 
 The console is responsive on phones and tablets. At narrow widths the desktop sidebar becomes a compact horizontal navigation bar, metric cards resize without clipping endpoint values, and traffic/user tables switch to labeled mobile cards. Long URLs, usernames, findings, commands, and configuration values wrap or scroll inside their own containers instead of expanding the page.
 
@@ -235,9 +235,9 @@ The Web UI stores and displays more than completed HTTP responses:
 - Server connection lifecycle records show outbound TCP/TLS destinations that may also appear in mitmproxy terminal logs.
 - WebSocket connections are tracked as active/closed records with message counts and close metadata.
 
-The traffic portal supports server-side filters for free-text content, host, method, exact status, status class, event type, lifecycle state, severity, TLS visibility, findings, session, duration range, time range, result size, and sort order. Filters are persisted locally in the browser, can be removed individually, and work with live polling and pagination.
+The traffic portal supports server-side filters for free-text content, host, method, exact status, status class, event type, lifecycle state, severity, TLS visibility, findings, session, duration range, time range, result size, and sort order. Filters are persisted locally in the browser, can be removed individually, and work with WebSocket-driven live updates and pagination.
 
-The default refresh interval is approximately 1.5 seconds. Use **Pause live** when reviewing older pages or a fixed result set.
+Traffic changes are signaled over `/ws/traffic` and coalesced before the filtered API view is refreshed. The browser reconnects automatically and uses a 3-second polling fallback only while the WebSocket is unavailable. Use **Pause live** when reviewing older pages or a fixed result set.
 
 ## Terminal mode
 
@@ -278,7 +278,7 @@ When TLS passthrough is enabled, the proxy can record the CONNECT destination an
 
 ### Web UI returns 500 on `/`
 
-Version 0.1.8 fixes Web UI crashes caused by Starlette/FastAPI template rendering API changes. Reinstall from the new project root and verify `imr-proxy --version` returns `0.1.8`.
+Version 0.1.8 fixes Web UI crashes caused by Starlette/FastAPI template rendering API changes. Reinstall from the new project root and verify `imr-proxy --version` returns `0.1.81`.
 
 Version 0.1.8 also fixes Linux test/development parity by removing the pytest async plugin requirement from the engine test and by creating a Linux user launcher at `~/.local/bin/imr-proxy`.
 
@@ -310,7 +310,7 @@ Version 0.1.8 fixes startup failures like `TypeError: Expected <class 'str'> for
   ```
 
   To expose the Web UI too, also pass `--web-host 0.0.0.0` and change the default `admin` password first.
-- If the Web UI reports that `admin` already exists during startup, upgrade to this fixed 0.1.8 build. User bootstrap is now idempotent and safe during parallel proxy/Web UI initialization.
+- If the Web UI reports that `admin` already exists during startup, upgrade to version 0.1.81 or later. User bootstrap is now idempotent and safe during parallel proxy/Web UI initialization.
 - Large bodies missing: adjust `--max-body-size`.
 - Sensitive data in report: use `--redaction-level strict`.
 
@@ -320,7 +320,7 @@ HTTP/3/QUIC interception is not implemented. WebSocket detail depends on mitmpro
 
 ## Roadmap
 
-Rule DSL, richer request modification, mkcert helper, WebSocket live UI, OpenAPI correlation, SARIF export, Docker image, encrypted local storage option, and plugin findings packs.
+Rule DSL, richer request modification, mkcert helper, OpenAPI correlation, SARIF export, Docker image, encrypted local storage option, and plugin findings packs.
 
 ## Security considerations
 

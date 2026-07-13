@@ -31,6 +31,13 @@ CREATE INDEX IF NOT EXISTS idx_flows_started_at ON flows(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_flows_host ON flows(host);
 CREATE INDEX IF NOT EXISTS idx_flows_method ON flows(method);
 CREATE INDEX IF NOT EXISTS idx_flows_status ON flows(status_code);
+CREATE TABLE IF NOT EXISTS traffic_revision (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    revision INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO traffic_revision(id, revision, updated_at)
+VALUES (1, 0, CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS findings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     flow_id TEXT NOT NULL,

@@ -15,4 +15,6 @@ def test_existing_legacy_flow_table_is_migrated(tmp_path):
     init_db(conn)
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(flows)").fetchall()}
     assert {"updated_at", "event_type", "state", "error_message", "intercepted_tls", "finding_count"}.issubset(columns)
+    revision = conn.execute("SELECT revision FROM traffic_revision WHERE id=1").fetchone()
+    assert revision["revision"] == 0
     conn.close()

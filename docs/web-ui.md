@@ -78,3 +78,9 @@ Keep the Web UI bound to `127.0.0.1` unless there is a clear authorized need for
 
 The Web UI uses a responsive layout. Below 1100 CSS pixels, the fixed desktop sidebar becomes a sticky top navigation bar. Below 700 pixels, traffic and user tables render as labeled cards, forms and panels become single-column, and typography/padding are reduced. Endpoint values, URLs, usernames, findings, commands, and JSON content use safe wrapping or contained scrolling to prevent horizontal page overflow. Static CSS and JavaScript URLs include a cache-busting revision suffix so browsers do not reuse the earlier desktop-only assets after an upgrade.
 
+
+## Real-time traffic stream
+
+The dashboard opens an authenticated same-origin WebSocket at `/ws/traffic`. New flows and updates to existing flows increment a persistent SQLite revision counter. The server sends a change notification immediately, and the browser reloads the currently filtered result set without a page refresh.
+
+The client automatically reconnects with bounded exponential backoff. While disconnected, it uses a three-second polling fallback. The live indicator shows **Connecting**, **Live**, **Reconnecting**, **Fallback**, or **Paused**. WebSocket handshakes require a valid console session and reject mismatched browser origins.

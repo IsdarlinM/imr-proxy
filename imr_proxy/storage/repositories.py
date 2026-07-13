@@ -5,6 +5,7 @@ from typing import Any
 
 from imr_proxy.models.flow import FlowRecord
 from imr_proxy.models.session import SessionRecord
+from imr_proxy.realtime import traffic_events
 
 
 def _dump(data: Any) -> str:
@@ -97,6 +98,10 @@ class FlowRepository:
                 _dump(flow.model_dump(mode="json")),
             ),
         )
+        self.conn.execute(
+            "UPDATE traffic_revision SET revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=1"
+        )
+        revision = self.revision()
         self.conn.execute("DELETE FROM findings WHERE flow_id=?", (flow.id,))
         for finding in flow.findings:
             self.conn.execute(
@@ -115,6 +120,13 @@ class FlowRepository:
                 ),
             )
         self.conn.commit()
+        traffic_events.publish(revision)
+
+    def revision(self) -> int:
+        row = self.conn.execute(
+            "SELECT revision FROM traffic_revision WHERE id=1"
+        ).fetchone()
+        return int(row["revision"] if row else 0)
 
     def list_by_session(self, session_id: str, limit: int | None = None) -> list[FlowRecord]:
         sql = "SELECT data FROM flows WHERE session_id=? ORDER BY started_at ASC"

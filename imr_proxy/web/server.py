@@ -17,6 +17,7 @@ from imr_proxy.version import get_version
 
 from .api import build_api
 from .auth import AuthError, SESSION_COOKIE, UserRepository
+from .websocket import register_traffic_websocket
 
 PUBLIC_PATH_PREFIXES = ("/static/",)
 PUBLIC_EXACT_PATHS = {"/login", "/favicon.ico"}
@@ -70,6 +71,7 @@ def create_app(config):
     templates = Jinja2Templates(directory=str(base_dir / "templates"))
     app.mount("/static", StaticFiles(directory=str(base_dir / "static")), name="static")
     app.include_router(build_api(flows, sessions, users))
+    register_traffic_websocket(app, config.storage)
 
     @app.middleware("http")
     async def require_console_login(request: Request, call_next):
