@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Annotated, Optional
 import typer
 from rich.console import Console
-from imr_proxy.app import maybe_first_run_prompt, print_banner, security_warnings, start_web_thread, validate_bind
+from imr_proxy.app import BindValidationError, maybe_first_run_prompt, print_banner, security_warnings, start_web_thread, validate_bind
 from imr_proxy.config import build_config, default_ca_dir, default_config_path, write_default_config
 from imr_proxy.logging import setup_logging
 from imr_proxy.proxy.certificates import export_ca, init_ca, load_ca_info, rotate_ca, sign_host_certificate
@@ -28,7 +28,13 @@ def _read_patterns(values, file):
 @app.command()
 def start(host: Annotated[Optional[str], typer.Option("--host")]=None, port: Annotated[Optional[int], typer.Option("--port")]=None, web: Annotated[Optional[bool], typer.Option("--web/--no-web")]=None, web_host: Annotated[Optional[str], typer.Option("--web-host")]=None, web_port: Annotated[Optional[int], typer.Option("--web-port")]=None, terminal: Annotated[bool, typer.Option("--terminal")]=False, quiet: Annotated[bool, typer.Option("--quiet")]=False, verbose: Annotated[bool, typer.Option("--verbose")]=False, allow_remote: Annotated[bool, typer.Option("--allow-remote")]=False, scope: Annotated[Optional[list[str]], typer.Option("--scope")]=None, scope_file: Annotated[Optional[Path], typer.Option("--scope-file")]=None, exclude: Annotated[Optional[list[str]], typer.Option("--exclude")]=None, exclude_file: Annotated[Optional[Path], typer.Option("--exclude-file")]=None, upstream_proxy: Annotated[Optional[str], typer.Option("--upstream-proxy")]=None, proxy_auth: Annotated[Optional[str], typer.Option("--proxy-auth")]=None, intercept_https: Annotated[bool, typer.Option("--intercept-https")]=False, tls_passthrough: Annotated[bool, typer.Option("--tls-passthrough")]=False, ca_dir: Annotated[Optional[Path], typer.Option("--ca-dir")]=None, cert_mode: Annotated[Optional[str], typer.Option("--cert-mode")]=None, storage: Annotated[Optional[Path], typer.Option("--storage")]=None, session_name: Annotated[Optional[str], typer.Option("--session-name")]=None, max_body_size: Annotated[Optional[int], typer.Option("--max-body-size")]=None, capture_bodies: Annotated[Optional[bool], typer.Option("--capture-bodies/--no-capture-bodies")]=None, redaction_level: Annotated[Optional[str], typer.Option("--redaction-level")]=None, export_json: Annotated[Optional[Path], typer.Option("--export-json")]=None, export_har: Annotated[Optional[Path], typer.Option("--export-har")]=None, export_html: Annotated[Optional[Path], typer.Option("--export-html")]=None, config: Annotated[Optional[Path], typer.Option("--config")]=None, no_color: Annotated[bool, typer.Option("--no-color")]=False, jsonl: Annotated[bool, typer.Option("--jsonl")]=False):
     overrides={"host":host,"port":port,"web":web,"web_host":web_host,"web_port":web_port,"terminal":terminal or None,"quiet":quiet or None,"verbose":verbose or None,"allow_remote":allow_remote or None,"scope":_read_patterns(scope,scope_file) if (scope or scope_file) else None,"exclude":_read_patterns(exclude,exclude_file) if (exclude or exclude_file) else None,"upstream_proxy":upstream_proxy,"proxy_auth":proxy_auth,"intercept_https":intercept_https or None,"tls_passthrough":tls_passthrough or (False if intercept_https else None),"ca_dir":ca_dir,"cert_mode":cert_mode or ("local-ca" if intercept_https else None),"storage":storage,"session_name":session_name,"max_body_size":max_body_size,"capture_bodies":capture_bodies,"redaction_level":redaction_level,"no_color":no_color or None,"jsonl":jsonl or None,"config":config}
-    cfg=build_config(config, overrides); setup_logging(cfg.verbose,cfg.quiet,cfg.no_color); cfg=maybe_first_run_prompt(cfg); validate_bind(cfg); print_banner(cfg); security_warnings(cfg); start_web_thread(cfg)
+    cfg=build_config(config, overrides); setup_logging(cfg.verbose,cfg.quiet,cfg.no_color); cfg=maybe_first_run_prompt(cfg)
+    try:
+        validate_bind(cfg)
+    except BindValidationError as exc:
+        console.print(f"[bold red]Configuration error:[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+    print_banner(cfg); security_warnings(cfg); start_web_thread(cfg)
     if export_json or export_har or export_html: logging.getLogger(__name__).info("Use sessions export after capture.")
     try: run_proxy(cfg)
     except KeyboardInterrupt: console.print("\n[cyan]imr-proxy stopped.[/cyan]")

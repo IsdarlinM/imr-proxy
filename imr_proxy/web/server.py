@@ -132,10 +132,14 @@ def create_app(config):
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request):
-        recent_flows = flows.recent(100)
+        recent_flows = flows.recent(250)
+        traffic_stats = flows.stats()
         stats = {
-            "total_flows": len(recent_flows),
-            "high_risk": sum(1 for f in recent_flows if f.get("highest_severity") in {"critical", "high"}),
+            "total_flows": traffic_stats["total"],
+            "high_risk": traffic_stats["high_risk"],
+            "pending": traffic_stats["pending"],
+            "errors": traffic_stats["errors"],
+            "connects": traffic_stats["connects"],
             "proxied_host": f"{config.host}:{config.port}",
             "web_host": f"{config.web_host}:{config.web_port}",
         }

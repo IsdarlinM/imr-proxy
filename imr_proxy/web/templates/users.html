@@ -33,17 +33,17 @@
 <section class="panel">
   <div class="panel-heading"><div><h3>User database</h3><p>Local users authorized to access the Web UI and API.</p></div></div>
   <div class="table-wrap">
-    <table class="data-table">
+    <table class="data-table mobile-cards">
       <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Must change</th><th>Last login</th><th>Action</th></tr></thead>
       <tbody>
         {% for u in users %}
         <tr>
-          <td><b>{{ u.username }}</b></td>
-          <td>{% if u.is_admin %}Admin{% else %}Analyst{% endif %}</td>
-          <td><span class="pill {% if u.is_active %}sev-low{% else %}sev-high{% endif %}">{% if u.is_active %}active{% else %}disabled{% endif %}</span></td>
-          <td>{{ 'yes' if u.must_change_password else 'no' }}</td>
-          <td>{{ u.last_login_at or '-' }}</td>
-          <td>
+          <td data-label="User"><b>{{ u.username }}</b></td>
+          <td data-label="Role">{% if u.is_admin %}Admin{% else %}Analyst{% endif %}</td>
+          <td data-label="Status"><span class="pill {% if u.is_active %}sev-low{% else %}sev-high{% endif %}">{% if u.is_active %}active{% else %}disabled{% endif %}</span></td>
+          <td data-label="Must change">{{ 'yes' if u.must_change_password else 'no' }}</td>
+          <td data-label="Last login">{{ u.last_login_at or '-' }}</td>
+          <td data-label="Action">
             {% if u.username != 'admin' %}
             <form method="post" action="/users/toggle" class="inline-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

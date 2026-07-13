@@ -5,7 +5,21 @@
 <section class="panel"><div class="empty">Flow not found.</div></section>
 {% else %}
 <section class="panel">
-  <div class="panel-heading"><div><h3>{{ flow.request.method }} {{ flow.request.url }}</h3><p>Captured request and response details with redaction applied.</p></div></div>
+  <div class="panel-heading">
+    <div>
+      <div class="live-title-row">
+        <h3>{{ flow.request.method }} {{ flow.request.url }}</h3>
+        <span class="event-badge event-{{ flow.event_type }}">{{ flow.event_type }}</span>
+        <span class="state-badge state-{{ flow.state }}">{{ flow.state }}</span>
+      </div>
+      <p>Captured lifecycle details with configured redaction applied.</p>
+    </div>
+  </div>
+  {% if flow.error_message %}<div class="alert error"><b>Error:</b> {{ flow.error_message }}</div>{% endif %}
+  <section class="metric-grid two">
+    <article class="metric-card"><span>Started</span><strong>{{ flow.started_at }}</strong><small>Last update: {{ flow.updated_at }}</small></article>
+    <article class="metric-card"><span>Connection</span><strong>{{ flow.client_address or 'Unknown client' }}</strong><small>Server: {{ flow.server_address or flow.request.host }}</small></article>
+  </section>
   <div class="detail-grid">
     <article><h4>Request headers</h4><pre class="codeblock">{{ flow.request.headers }}</pre></article>
     <article><h4>Request body</h4><pre class="codeblock">{{ flow.request.body_text or '' }}</pre></article>
@@ -13,10 +27,18 @@
 </section>
 {% if flow.response %}
 <section class="panel">
-  <div class="panel-heading"><div><h3>Response {{ flow.response.status_code }}</h3></div></div>
+  <div class="panel-heading"><div><h3>Response {{ flow.response.status_code }}</h3><p>{{ flow.response.reason }}</p></div></div>
   <div class="detail-grid">
     <article><h4>Response headers</h4><pre class="codeblock">{{ flow.response.headers }}</pre></article>
     <article><h4>Response body</h4><pre class="codeblock">{{ flow.response.body_text or '' }}</pre></article>
+  </div>
+</section>
+{% endif %}
+{% if flow.metadata or flow.tls_metadata %}
+<section class="panel">
+  <div class="detail-grid">
+    <article><h4>Event metadata</h4><pre class="codeblock">{{ flow.metadata }}</pre></article>
+    <article><h4>TLS metadata</h4><pre class="codeblock">{{ flow.tls_metadata }}</pre></article>
   </div>
 </section>
 {% endif %}
@@ -24,7 +46,7 @@
   <div class="panel-heading"><div><h3>Findings</h3><p>Defensive observations only; validate safely before assigning severity.</p></div></div>
   {% for x in flow.findings %}
     <article class="finding-card sev-border-{{ x.severity }}"><h4>{{ x.severity|upper }} · {{ x.title }}</h4><p><code>{{ x.id }}</code></p><p><b>Evidence:</b> {{ x.evidence }}</p><p><b>Remediation:</b> {{ x.remediation }}</p></article>
-  {% else %}<div class="empty">No findings.</div>{% endfor %}
+  {% else %}<div class="empty">No findings for this event.</div>{% endfor %}
 </section>
 {% endif %}
 {% endblock %}

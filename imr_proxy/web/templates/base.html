@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050816">
   <title>imr-proxy · Console</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ version }}-traffic-r2">
 </head>
 <body>
   <div class="shell">
@@ -38,7 +39,7 @@
         <div class="userbox">
           {% if user %}
             <span class="avatar">{{ user.username[:1]|upper }}</span>
-            <div><b>{{ user.username }}</b><small>{% if user.is_admin %}Administrator{% else %}Analyst{% endif %}</small></div>
+            <div class="identity"><b>{{ user.username }}</b><small>{% if user.is_admin %}Administrator{% else %}Analyst{% endif %}</small></div>
             <a class="button ghost" href="/logout">Logout</a>
           {% endif %}
         </div>
@@ -49,6 +50,6 @@
       {% block content %}{% endblock %}
     </main>
   </div>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ version }}-traffic-r2"></script>
 </body>
 </html>

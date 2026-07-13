@@ -189,7 +189,9 @@ Important `start` flags: `--host`, `--port`, `--web`, `--no-web`, `--web-host`, 
 
 ## Web UI
 
-Includes a cyber-themed dashboard, traffic table, flow detail, headers/cookies/body views, findings panel, certificate page, settings/about page, users page, and authenticated JSON API endpoints.
+Includes a cyber-themed dashboard, live traffic table, flow detail, headers/cookies/body views, findings panel, certificate page, settings/about page, users page, and authenticated JSON API endpoints. The dashboard now polls for new lifecycle records, so pending requests, completed responses, failed requests, CONNECT tunnels, server connections, and WebSocket sessions appear without manually reloading the page.
+
+The console is responsive on phones and tablets. At narrow widths the desktop sidebar becomes a compact horizontal navigation bar, metric cards resize without clipping endpoint values, and traffic/user tables switch to labeled mobile cards. Long URLs, usernames, findings, commands, and configuration values wrap or scroll inside their own containers instead of expanding the page.
 
 ### Web console login
 
@@ -223,6 +225,20 @@ imr-proxy users delete analyst01 --yes
 
 If `--password` is omitted, the CLI prompts securely. User records and web sessions are stored in the configured SQLite database. Passwords are stored as PBKDF2-HMAC-SHA256 hashes with per-user random salts; plaintext passwords are never stored.
 
+
+### Live traffic visibility and filters
+
+The Web UI stores and displays more than completed HTTP responses:
+
+- HTTP requests appear as `pending` as soon as their headers are received and are updated in place when a response or error arrives.
+- HTTPS passthrough destinations appear as `CONNECT` events even though encrypted inner paths remain unavailable without authorized interception.
+- Server connection lifecycle records show outbound TCP/TLS destinations that may also appear in mitmproxy terminal logs.
+- WebSocket connections are tracked as active/closed records with message counts and close metadata.
+
+The traffic portal supports server-side filters for free-text content, host, method, exact status, status class, event type, lifecycle state, severity, TLS visibility, findings, session, duration range, time range, result size, and sort order. Filters are persisted locally in the browser, can be removed individually, and work with live polling and pagination.
+
+The default refresh interval is approximately 1.5 seconds. Use **Pause live** when reviewing older pages or a fixed result set.
+
 ## Terminal mode
 
 ```bash
@@ -255,6 +271,11 @@ Redacted by default: Authorization, Cookie, Set-Cookie, API keys, tokens, passwo
 
 ## Troubleshooting
 
+
+### A destination appears in CLI logs but not as a full HTTPS URL
+
+When TLS passthrough is enabled, the proxy can record the CONNECT destination and server connection, such as `github.com:443`, but cannot see the encrypted request path, headers, or response content. Enable authorized HTTPS interception and install the local CA manually when full HTTPS inspection is required. The Web UI now displays CONNECT and connection lifecycle events so these destinations are not silently omitted.
+
 ### Web UI returns 500 on `/`
 
 Version 0.1.8 fixes Web UI crashes caused by Starlette/FastAPI template rendering API changes. Reinstall from the new project root and verify `imr-proxy --version` returns `0.1.8`.
@@ -282,7 +303,14 @@ Version 0.1.8 fixes startup failures like `TypeError: Expected <class 'str'> for
 
 - TLS errors: export and manually trust the local CA in the authorized test client.
 - No HTTPS body visibility: enable `--intercept-https`, use `--cert-mode local-ca`, and trust the CA.
-- Remote bind refused: add `--allow-remote` intentionally and restrict network access.
+- Remote bind refused: this is expected when using `--host 0.0.0.0` or `--web-host 0.0.0.0` without explicit consent. Use `--allow-remote` only when you intentionally want the proxy or Web UI reachable from another device, and restrict access with firewall rules. Example:
+
+  ```bash
+  imr-proxy start --web --host 0.0.0.0 --port 8585 --allow-remote
+  ```
+
+  To expose the Web UI too, also pass `--web-host 0.0.0.0` and change the default `admin` password first.
+- If the Web UI reports that `admin` already exists during startup, upgrade to this fixed 0.1.8 build. User bootstrap is now idempotent and safe during parallel proxy/Web UI initialization.
 - Large bodies missing: adjust `--max-body-size`.
 - Sensitive data in report: use `--redaction-level strict`.
 

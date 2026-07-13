@@ -48,3 +48,35 @@ def test_cli_user_commands(tmp_path):
     assert result.exit_code == 0, result.output
     result = runner.invoke(app, ["users", "delete", "analyst02", "--yes", "--storage", storage])
     assert result.exit_code == 0, result.output
+
+
+def test_default_admin_init_is_idempotent_for_repeated_startup(tmp_path):
+    db = tmp_path / "startup-users.sqlite3"
+    conn1 = connect(db)
+    init_db(conn1)
+    conn2 = connect(db)
+    init_db(conn2)
+    repo = UserRepository(conn2)
+    users = repo.list_users()
+    assert [u["username"] for u in users].count("admin") == 1
+    assert repo.authenticate("admin", "admin")
+
+
+def test_default_admin_init_is_safe_under_parallel_startup(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    db = tmp_path / "parallel-startup-users.sqlite3"
+
+    def init_once():
+        conn = connect(db)
+        init_db(conn)
+        return UserRepository(conn).authenticate("admin", "admin") is not None
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: init_once(), range(16)))
+
+    assert all(results)
+    conn = connect(db)
+    init_db(conn)
+    users = UserRepository(conn).list_users()
+    assert [u["username"] for u in users].count("admin") == 1

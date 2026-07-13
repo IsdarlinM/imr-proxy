@@ -67,10 +67,31 @@ class UserRepository:
         self.conn = conn
 
     def ensure_default_admin(self) -> None:
+        """Create the default admin account only for a fresh user database.
+
+        This method is intentionally idempotent and safe when the Web UI and
+        proxy engine initialize the same SQLite database at nearly the same
+        time.  A previous implementation performed a count and then called
+        create_user(); two startup threads could both observe an empty table,
+        one insert would win, and the second would crash the Web UI with a
+        UNIQUE constraint error.
+        """
         row = self.conn.execute("SELECT COUNT(*) AS n FROM users").fetchone()
         if row and row["n"]:
             return
-        self.create_user("admin", "admin", is_admin=True, must_change_password=True)
+
+        now = utc_now().isoformat()
+        password_hash = hash_password("admin")
+        self.conn.execute(
+            """
+            INSERT OR IGNORE INTO users(
+                username,password_hash,is_admin,is_active,must_change_password,
+                created_at,updated_at,created_by
+            ) VALUES(?,?,?,?,?,?,?,?)
+            """,
+            ("admin", password_hash, 1, 1, 1, now, now, "system"),
+        )
+        self.conn.commit()
 
     def create_user(
         self,

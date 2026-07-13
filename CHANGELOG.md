@@ -16,7 +16,20 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Console passwords are stored with PBKDF2-HMAC-SHA256 and per-user random salts.
 - Web sessions are stored as SHA-256 token hashes and delivered with HttpOnly `SameSite=Lax` cookies.
 
+### Improved
+- Added live Web UI polling, stable flow upserts, pagination, filter chips, persisted filters, and server-side advanced traffic search without changing version 0.1.8.
+- Added filters for host, method, exact status, status class, event type, lifecycle state, severity, TLS visibility, findings, session, duration, time range, row limit, and sort order.
+- Added request-pending, HTTP-error, CONNECT tunnel, outbound server connection, and WebSocket lifecycle visibility so terminal-observed destinations are represented in the portal.
+- Reworked mobile and tablet Web UI sizing without changing version 0.1.8: the fixed sidebar becomes a compact top navigation, dashboard metrics use responsive grids, endpoint text wraps safely, and user identity controls no longer collide.
+- Added mobile card rendering for traffic and user tables, safe-area support, smaller fluid typography, touch-friendly horizontal navigation, and cache-busted CSS/JS assets.
+
 ### Fixed
+- Fixed the portal showing only the initial server-rendered traffic snapshot; rows now refresh automatically and update by stable flow ID.
+- Fixed completed-response-only capture, which omitted pending requests, failed requests, and TLS passthrough CONNECT destinations.
+- Added backward-compatible SQLite migration for lifecycle columns and indexes in existing 0.1.8 databases.
+- Fixed Web UI startup crash when the proxy engine and Web UI initialized the same SQLite storage at nearly the same time and both tried to bootstrap the default `admin` user.
+- Fixed concurrent SQLite initialization by adding a busy timeout and retry logic around schema/user bootstrap.
+- Fixed unsafe remote-bind validation so `--host 0.0.0.0` or `--web-host 0.0.0.0` without `--allow-remote` exits cleanly with a clear configuration error instead of a Python traceback.
 - Fixed Linux test parity by removing the pytest async plugin dependency from the mitmproxy engine regression test.
 - Fixed Linux installer command exposure by creating a user launcher at `~/.local/bin/imr-proxy`.
 - Fixed Web UI dashboard endpoint display so custom proxy/web ports are shown instead of hardcoded defaults.
