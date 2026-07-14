@@ -113,30 +113,33 @@ def test_mobile_assets_and_responsive_markup(tmp_path):
     login_page = client.get("/login")
     assert login_page.status_code == 200
     assert "viewport-fit=cover" in login_page.text
-    assert "style.css?v=0.1.81-realtime-r1" in login_page.text
+    assert "style.css?v=0.1.82-console-r1" in login_page.text
 
     _login(client)
     dashboard = client.get("/")
     assert dashboard.status_code == 200
-    assert 'class="data-table mobile-cards"' in dashboard.text
-    assert 'data-label="Host / URL"' in Path("imr_proxy/web/templates/dashboard.html").read_text()
+    assert 'id="traffic-log"' in dashboard.text
+    assert 'id="flow-drawer"' in dashboard.text
+    assert 'class="traffic-log-row"' in Path("imr_proxy/web/templates/dashboard.html").read_text()
     assert 'id="filter-status"' in dashboard.text
     assert 'id="traffic-filters"' in dashboard.text
     assert 'id="filter-event-type"' in dashboard.text
     assert 'id="filter-tls"' in dashboard.text
     assert 'id="toggle-live"' in dashboard.text
-    assert "app.js?v=0.1.81-realtime-r1" in dashboard.text
+    assert "app.js?v=0.1.82-console-r1" in dashboard.text
 
     stylesheet = client.get("/static/style.css")
     assert stylesheet.status_code == 200
     assert "@media screen and (max-width: 1100px)" in stylesheet.text
     assert "@media screen and (max-width: 700px)" in stylesheet.text
-    assert ".data-table.mobile-cards" in stylesheet.text
+    assert ".traffic-log-row" in stylesheet.text
+    assert ".flow-drawer" in stylesheet.text
     assert "overflow-wrap: anywhere" in stylesheet.text
 
     javascript = client.get("/static/app.js")
     assert javascript.status_code == 200
-    assert 'dataset.label' in javascript.text
+    assert 'openFlowDrawer' in javascript.text
+    assert 'renderLogRows' in javascript.text
     assert 'aria-current' in javascript.text
     assert '/api/flows?' in javascript.text
     assert 'new WebSocket' in javascript.text

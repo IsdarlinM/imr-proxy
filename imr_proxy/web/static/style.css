@@ -1440,3 +1440,443 @@ pre {
 }
 .event-connection { color: #ffd8a8; border-color: rgba(255, 166, 77, 0.42); background: rgba(255, 166, 77, 0.08); }
 .state-disconnected { color: #b8c9e8; border-color: rgba(140, 160, 197, 0.35); }
+
+/* 0.1.82 compact network console ---------------------------------------- */
+.traffic-console {
+  padding: 18px;
+}
+
+.traffic-log {
+  min-height: 120px;
+  border: 1px solid rgba(140, 160, 197, 0.2);
+  border-radius: 10px;
+  background: #050a16;
+  overflow: hidden;
+  transition: opacity 120ms ease;
+}
+
+.traffic-log.is-loading {
+  opacity: 0.58;
+}
+
+.traffic-log-row {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(140, 160, 197, 0.14);
+  border-radius: 0;
+  padding: 7px 10px 6px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.traffic-log-row:last-child {
+  border-bottom: 0;
+}
+
+.traffic-log-row:hover,
+.traffic-log-row:focus-visible {
+  background: rgba(34, 211, 238, 0.055);
+  outline: none;
+}
+
+.traffic-log-row.selected {
+  background: rgba(34, 211, 238, 0.1);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+
+.log-primary,
+.log-meta {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.log-primary {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.log-meta {
+  margin-top: 3px;
+  color: #8093b6;
+  font-size: 0.67rem;
+  line-height: 1.28;
+  flex-wrap: wrap;
+}
+
+.log-time {
+  flex: 0 0 auto;
+  color: #7689ad;
+}
+
+.log-event,
+.log-method,
+.log-status,
+.log-severity {
+  flex: 0 0 auto;
+}
+
+.log-event {
+  min-width: 126px;
+  color: #bfeeff;
+  font-size: 0.69rem;
+  letter-spacing: 0.025em;
+}
+
+.log-method {
+  min-width: 58px;
+  color: #f5f8ff;
+}
+
+.log-status {
+  min-width: 34px;
+  color: #94a6c9;
+  font-weight: 800;
+  text-align: right;
+}
+
+.log-status.status-2xx { color: var(--green); }
+.log-status.status-3xx { color: var(--cyan); }
+.log-status.status-4xx { color: var(--amber); }
+.log-status.status-5xx { color: var(--red); }
+
+.log-target {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: #dce7ff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-severity {
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.log-token {
+  min-width: 0;
+  max-width: min(440px, 42vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-token-label {
+  color: #5f7399;
+  font-weight: 700;
+}
+
+.log-error {
+  color: #ff9fb2;
+  max-width: min(620px, 60vw);
+}
+
+.traffic-log-empty {
+  padding: 24px 14px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Desktop event inspection drawer */
+.flow-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 79;
+  background: rgba(1, 4, 12, 0.54);
+  backdrop-filter: blur(2px);
+}
+
+.flow-drawer {
+  position: fixed;
+  z-index: 80;
+  top: 0;
+  right: 0;
+  width: min(620px, 48vw);
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-left: 1px solid rgba(34, 211, 238, 0.3);
+  color: var(--text);
+  background: #080f20;
+  box-shadow: -30px 0 80px rgba(0, 0, 0, 0.5);
+  transform: translateX(102%);
+  transition: transform 180ms ease;
+  overflow: hidden;
+}
+
+.flow-drawer.open {
+  transform: translateX(0);
+}
+
+.flow-drawer-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 18px 20px 15px;
+  background: rgba(11, 18, 37, 0.98);
+}
+
+.flow-drawer-header > div {
+  min-width: 0;
+}
+
+.flow-drawer-header h3,
+.drawer-subtitle {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.flow-drawer-header h3 {
+  margin: 2px 0 5px;
+  font-size: 1rem;
+}
+
+.drawer-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font: 0.72rem/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.drawer-close {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.025);
+  cursor: pointer;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.drawer-close:hover,
+.drawer-close:focus-visible {
+  border-color: var(--cyan);
+  outline: none;
+}
+
+.flow-drawer-content,
+.drawer-loading {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px 24px;
+  scrollbar-color: #304467 #080f20;
+}
+
+.drawer-loading {
+  color: var(--muted);
+}
+
+.flow-drawer-footer {
+  border-top: 1px solid var(--line);
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  background: #0b1225;
+}
+
+.drawer-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.drawer-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid rgba(140, 160, 197, 0.18);
+  background: rgba(140, 160, 197, 0.18);
+}
+
+.drawer-kv-item {
+  min-width: 0;
+  padding: 9px 10px;
+  background: #091124;
+}
+
+.drawer-kv-label,
+.drawer-kv-value {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.drawer-kv-label {
+  margin-bottom: 3px;
+  color: #7589af;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.drawer-kv-value {
+  color: #d9e5fb;
+  font: 0.73rem/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.drawer-section {
+  margin-top: 12px;
+  border: 1px solid rgba(140, 160, 197, 0.18);
+  background: #071021;
+}
+
+.drawer-section-title {
+  padding: 10px 12px;
+  color: #c7d6ef;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.drawer-code {
+  max-height: 360px;
+  margin: 0;
+  border-top: 1px solid rgba(140, 160, 197, 0.14);
+  padding: 12px;
+  color: #bdd0ee;
+  background: #040914;
+  font: 0.7rem/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.drawer-findings {
+  display: grid;
+  gap: 9px;
+  border-top: 1px solid rgba(140, 160, 197, 0.14);
+  padding: 10px;
+}
+
+.drawer-finding {
+  border-left: 3px solid #56698d;
+  padding: 9px 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.drawer-finding h4,
+.drawer-finding p {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+
+body.drawer-open {
+  overflow: hidden;
+}
+
+@media screen and (min-width: 901px) {
+  .flow-drawer-backdrop {
+    background: rgba(1, 4, 12, 0.25);
+  }
+}
+
+@media screen and (max-width: 900px) {
+  .flow-drawer {
+    width: min(680px, 100vw);
+  }
+  .log-event {
+    min-width: 112px;
+  }
+  .log-token {
+    max-width: min(330px, 48vw);
+  }
+}
+
+@media screen and (max-width: 620px) {
+  .traffic-console {
+    padding: 12px;
+  }
+  .traffic-notice {
+    font-size: 0.78rem;
+  }
+  .traffic-log-row {
+    padding: 8px;
+  }
+  .log-primary {
+    flex-wrap: wrap;
+    gap: 5px 7px;
+    white-space: normal;
+  }
+  .log-event,
+  .log-method {
+    min-width: auto;
+  }
+  .log-target {
+    flex-basis: 100%;
+    order: 10;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .log-meta {
+    gap: 4px 8px;
+  }
+  .log-token,
+  .log-error {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .flow-drawer {
+    width: 100vw;
+    border-left: 0;
+  }
+  .flow-drawer-header,
+  .flow-drawer-content,
+  .drawer-loading,
+  .flow-drawer-footer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .drawer-kv-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-drawer {
+    transition: none;
+  }
+}
+
+.flow-drawer-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px 24px;
+  scrollbar-color: #304467 #080f20;
+}
+
+.flow-drawer-body .flow-drawer-content,
+.flow-drawer-body .drawer-loading {
+  padding: 0;
+  overflow: visible;
+}
+
+.flow-drawer-body > .alert {
+  margin: 0 0 12px;
+}
+
+@media screen and (max-width: 620px) {
+  .flow-drawer-body {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}

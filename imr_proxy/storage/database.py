@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import time
 from pathlib import Path
@@ -37,6 +38,16 @@ def _ensure_flow_columns(conn: sqlite3.Connection) -> None:
         "error_message": "TEXT",
         "intercepted_tls": "INTEGER NOT NULL DEFAULT 0",
         "finding_count": "INTEGER NOT NULL DEFAULT 0",
+        "client_address": "TEXT",
+        "server_address": "TEXT",
+        "scheme": "TEXT",
+        "port": "INTEGER",
+        "http_version": "TEXT",
+        "user_agent": "TEXT",
+        "content_type": "TEXT",
+        "request_size": "INTEGER NOT NULL DEFAULT 0",
+        "response_size": "INTEGER NOT NULL DEFAULT 0",
+        "tags_json": "TEXT NOT NULL DEFAULT '[]'",
     }
     for name, definition in additions.items():
         if name not in existing:
@@ -47,6 +58,64 @@ def _ensure_flow_columns(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_event_state ON flows(event_type, state)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_severity ON flows(highest_severity)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_updated_at ON flows(updated_at DESC)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_client_address ON flows(client_address)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_user_agent ON flows(user_agent)")
+
+    # Backfill compact-console summary fields for databases created by older builds.
+    rows = conn.execute(
+        """
+        SELECT id, data FROM flows
+        WHERE client_address IS NULL OR server_address IS NULL OR http_version IS NULL
+           OR user_agent IS NULL OR content_type IS NULL
+        """
+    ).fetchall()
+    for row in rows:
+        try:
+            payload = json.loads(row["data"])
+            request = payload.get("request") or {}
+            response = payload.get("response") or {}
+            request_headers = request.get("headers") or {}
+            response_headers = response.get("headers") or {}
+            user_agent = next(
+                (str(value) for key, value in request_headers.items() if str(key).lower() == "user-agent"),
+                None,
+            )
+            content_type = next(
+                (str(value) for key, value in response_headers.items() if str(key).lower() == "content-type"),
+                None,
+            )
+            conn.execute(
+                """
+                UPDATE flows SET
+                    client_address=COALESCE(client_address, ?),
+                    server_address=COALESCE(server_address, ?),
+                    scheme=COALESCE(scheme, ?),
+                    port=COALESCE(port, ?),
+                    http_version=COALESCE(http_version, ?),
+                    user_agent=COALESCE(user_agent, ?),
+                    content_type=COALESCE(content_type, ?),
+                    request_size=CASE WHEN request_size=0 THEN ? ELSE request_size END,
+                    response_size=CASE WHEN response_size=0 THEN ? ELSE response_size END,
+                    tags_json=CASE WHEN tags_json='[]' THEN ? ELSE tags_json END
+                WHERE id=?
+                """,
+                (
+                    payload.get("client_address") or "",
+                    payload.get("server_address") or "",
+                    request.get("scheme") or "",
+                    request.get("port"),
+                    response.get("http_version") or request.get("http_version") or "",
+                    user_agent or "",
+                    content_type or "",
+                    int(request.get("body_size") or 0),
+                    int(response.get("body_size") or 0),
+                    json.dumps(payload.get("tags") or []),
+                    row["id"],
+                ),
+            )
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS traffic_revision (

@@ -21,7 +21,7 @@
         <h3>Live traffic</h3>
         <span id="live-indicator" class="live-indicator connecting"><i></i><span id="live-status-text">Connecting</span></span>
       </div>
-      <p>Streams completed, pending, failed, CONNECT, and WebSocket events in real time.</p>
+      <p>Compact network log stream. Select an event to inspect full request, response, connection, TLS, and finding details.</p>
     </div>
     <div class="traffic-actions">
       <button id="toggle-live" class="button ghost" type="button">Pause live</button>
@@ -31,184 +31,61 @@
   </div>
 
   <div class="traffic-notice">
-    <strong>TLS passthrough visibility:</strong>
-    CONNECT tunnels such as <code>github.com:443</code> are now stored and shown. Inner HTTPS paths are only visible when authorized HTTPS interception is enabled and the local CA is trusted.
+    <strong>Compact view:</strong> each log prioritizes time, event, method, status, destination, source, protocol, User-Agent, size, duration, and findings. Click a log to open the inspection drawer.
   </div>
 
   <form id="traffic-filters" class="filter-grid" autocomplete="off">
-    <label class="filter-field filter-search-wide">
-      <span>Search</span>
-      <input id="filter-q" name="q" type="search" placeholder="URL, host, method, or error text">
-    </label>
-    <label class="filter-field">
-      <span>Host</span>
-      <input id="filter-host" name="host" list="host-options" placeholder="github.com">
-      <datalist id="host-options"></datalist>
-    </label>
-    <label class="filter-field">
-      <span>Method</span>
-      <select id="filter-method" name="method">
-        <option value="">All methods</option>
-        <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option><option>CONNECT</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>Event type</span>
-      <select id="filter-event-type" name="event_type">
-        <option value="">All event types</option>
-        <option value="http">HTTP</option>
-        <option value="connect">CONNECT</option>
-        <option value="websocket">WebSocket</option>
-        <option value="connection">Server connection</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>State</span>
-      <select id="filter-state" name="state">
-        <option value="">All states</option>
-        <option value="pending">Pending</option>
-        <option value="complete">Complete</option>
-        <option value="connected">Connected</option>
-        <option value="active">Active</option>
-        <option value="closed">Closed</option>
-        <option value="disconnected">Disconnected</option>
-        <option value="error">Error</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>Status</span>
-      <select id="filter-status-code" name="status_class">
-        <option value="">All statuses</option>
-        <option value="none">No status</option>
-        <option value="1xx">1xx informational</option>
-        <option value="2xx">2xx success</option>
-        <option value="3xx">3xx redirect</option>
-        <option value="4xx">4xx client error</option>
-        <option value="5xx">5xx server error</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>Exact status</span>
-      <input id="filter-exact-status" name="status" type="number" min="100" max="599" step="1" placeholder="e.g. 404">
-    </label>
-    <label class="filter-field">
-      <span>Severity</span>
-      <select id="filter-severity" name="severity">
-        <option value="">All severities</option>
-        <option value="critical">Critical</option>
-        <option value="high">High</option>
-        <option value="medium">Medium</option>
-        <option value="low">Low</option>
-        <option value="info">Info</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>TLS visibility</span>
-      <select id="filter-tls" name="tls">
-        <option value="">All traffic</option>
-        <option value="intercepted">HTTPS intercepted</option>
-        <option value="passthrough">TLS passthrough / CONNECT</option>
-        <option value="http">Plain HTTP</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>Findings</span>
-      <select id="filter-findings" name="has_findings">
-        <option value="">Any</option>
-        <option value="true">Has findings</option>
-        <option value="false">No findings</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>Min duration (ms)</span>
-      <input id="filter-min-duration" name="min_duration" type="number" min="0" step="1" placeholder="0">
-    </label>
-    <label class="filter-field">
-      <span>Max duration (ms)</span>
-      <input id="filter-max-duration" name="max_duration" type="number" min="0" step="1" placeholder="Any">
-    </label>
-    <label class="filter-field">
-      <span>Session</span>
-      <select id="filter-session" name="session_id">
-        <option value="">All sessions</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>From</span>
-      <input id="filter-from-time" name="from_time" type="datetime-local">
-    </label>
-    <label class="filter-field">
-      <span>To</span>
-      <input id="filter-to-time" name="to_time" type="datetime-local">
-    </label>
-    <label class="filter-field">
-      <span>Rows</span>
-      <select id="filter-limit" name="limit">
-        <option value="100">100</option>
-        <option value="250" selected>250</option>
-        <option value="500">500</option>
-        <option value="1000">1000</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>Order</span>
-      <select id="filter-order" name="order">
-        <option value="desc">Newest first</option>
-        <option value="asc">Oldest first</option>
-      </select>
-    </label>
-    <div class="filter-submit-wrap">
-      <button class="button primary" type="submit">Apply filters</button>
-    </div>
+    <label class="filter-field filter-search-wide"><span>Search</span><input id="filter-q" name="q" type="search" placeholder="URL, host, source, User-Agent, method, or error"></label>
+    <label class="filter-field"><span>Host</span><input id="filter-host" name="host" list="host-options" placeholder="github.com"><datalist id="host-options"></datalist></label>
+    <label class="filter-field"><span>Method</span><select id="filter-method" name="method"><option value="">All methods</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option><option>CONNECT</option><option>TCP</option></select></label>
+    <label class="filter-field"><span>Event type</span><select id="filter-event-type" name="event_type"><option value="">All event types</option><option value="http">HTTP</option><option value="connect">CONNECT</option><option value="websocket">WebSocket</option><option value="connection">Server connection</option></select></label>
+    <label class="filter-field"><span>State</span><select id="filter-state" name="state"><option value="">All states</option><option value="pending">Pending</option><option value="complete">Complete</option><option value="connected">Connected</option><option value="active">Active</option><option value="closed">Closed</option><option value="disconnected">Disconnected</option><option value="error">Error</option></select></label>
+    <label class="filter-field"><span>Status</span><select id="filter-status-code" name="status_class"><option value="">All statuses</option><option value="none">No status</option><option value="1xx">1xx informational</option><option value="2xx">2xx success</option><option value="3xx">3xx redirect</option><option value="4xx">4xx client error</option><option value="5xx">5xx server error</option></select></label>
+    <label class="filter-field"><span>Exact status</span><input id="filter-exact-status" name="status" type="number" min="100" max="599" step="1" placeholder="e.g. 404"></label>
+    <label class="filter-field"><span>Severity</span><select id="filter-severity" name="severity"><option value="">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="info">Info</option></select></label>
+    <label class="filter-field"><span>TLS visibility</span><select id="filter-tls" name="tls"><option value="">All traffic</option><option value="intercepted">HTTPS intercepted</option><option value="passthrough">TLS passthrough / CONNECT</option><option value="http">Plain HTTP</option></select></label>
+    <label class="filter-field"><span>Findings</span><select id="filter-findings" name="has_findings"><option value="">Any</option><option value="true">Has findings</option><option value="false">No findings</option></select></label>
+    <label class="filter-field"><span>Min duration (ms)</span><input id="filter-min-duration" name="min_duration" type="number" min="0" step="1" placeholder="0"></label>
+    <label class="filter-field"><span>Max duration (ms)</span><input id="filter-max-duration" name="max_duration" type="number" min="0" step="1" placeholder="Any"></label>
+    <label class="filter-field"><span>Session</span><select id="filter-session" name="session_id"><option value="">All sessions</option></select></label>
+    <label class="filter-field"><span>From</span><input id="filter-from-time" name="from_time" type="datetime-local"></label>
+    <label class="filter-field"><span>To</span><input id="filter-to-time" name="to_time" type="datetime-local"></label>
+    <label class="filter-field"><span>Rows</span><select id="filter-limit" name="limit"><option value="100">100</option><option value="250" selected>250</option><option value="500">500</option><option value="1000">1000</option></select></label>
+    <label class="filter-field"><span>Order</span><select id="filter-order" name="order"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select></label>
+    <div class="filter-submit-wrap"><button class="button primary" type="submit">Apply filters</button></div>
   </form>
 
   <div class="filter-summary-bar">
     <div id="active-filters" class="filter-chips" aria-live="polite"></div>
-    <div class="traffic-meta">
-      <span id="filter-status" class="muted">Loading traffic…</span>
-      <span id="last-updated" class="muted"></span>
-    </div>
+    <div class="traffic-meta"><span id="filter-status" class="muted">Loading traffic…</span><span id="last-updated" class="muted"></span></div>
   </div>
-
   <div id="traffic-error" class="alert error" hidden></div>
 
-  <div class="table-wrap traffic-table-wrap">
-    <table id="flows" class="data-table mobile-cards">
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>Type</th>
-          <th>State</th>
-          <th>Method</th>
-          <th>Host / URL</th>
-          <th>Status</th>
-          <th>Duration</th>
-          <th>Severity</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for f in flows %}
-        <tr data-flow-id="{{ f.id }}">
-          <td class="nowrap" data-label="Time">{{ f.updated_at or f.started_at }}</td>
-          <td data-label="Type"><span class="event-badge event-{{ f.event_type or 'http' }}">{{ f.event_type or 'http' }}</span></td>
-          <td data-label="State"><span class="state-badge state-{{ f.state or 'complete' }}">{{ f.state or 'complete' }}</span></td>
-          <td data-label="Method"><span class="method">{{ f.method }}</span></td>
-          <td class="url" data-label="Host / URL"><a href="/flows/{{ f.id }}">{{ f.url }}</a>{% if f.error_message %}<small class="row-error">{{ f.error_message }}</small>{% endif %}</td>
-          <td data-label="Status">{{ f.status_code if f.status_code is not none else '—' }}</td>
-          <td data-label="Duration">{% if f.duration_ms is not none %}{{ "%.1f"|format(f.duration_ms) }} ms{% else %}—{% endif %}</td>
-          <td data-label="Severity"><span class="pill sev-{{ f.highest_severity or 'info' }}">{{ f.highest_severity or 'info' }}</span></td>
-        </tr>
-      {% else %}
-        <tr><td colspan="8" class="empty">No traffic captured yet. Configure your browser or client to use {{ stats.proxied_host }} as its HTTP(S) proxy.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
+  <div id="traffic-log" class="traffic-log" role="list" aria-label="Captured proxy events">
+    {% for f in flows %}
+    <button class="traffic-log-row" type="button" role="listitem" data-flow-id="{{ f.id }}">
+      <span class="log-primary"><time>{{ f.updated_at or f.started_at }}</time><b class="log-event">{{ (f.event_type or 'http')|upper }}/{{ (f.state or 'complete')|upper }}</b><strong class="log-method">{{ f.method }}</strong><span class="log-status">{{ f.status_code if f.status_code is not none else '—' }}</span><span class="log-target">{{ f.url }}</span></span>
+      <span class="log-meta"><span>src={{ f.client_address or '—' }}</span><span>dst={{ f.server_address or f.host or '—' }}</span><span>proto={{ f.http_version or f.scheme or '—' }}</span><span>ua={{ f.user_agent or '—' }}</span><span>req={{ f.request_size or 0 }}B</span><span>res={{ f.response_size or 0 }}B</span><span>dur={{ '%.1f'|format(f.duration_ms) if f.duration_ms is not none else '—' }}ms</span><span>findings={{ f.finding_count or 0 }}</span></span>
+    </button>
+    {% else %}
+    <div class="traffic-log-empty">No traffic captured yet. Configure your browser or client to use {{ stats.proxied_host }} as its HTTP(S) proxy.</div>
+    {% endfor %}
   </div>
 
-  <div class="pagination-bar">
-    <button id="previous-page" class="button ghost" type="button" disabled>Previous</button>
-    <span id="page-status" class="muted">Page 1</span>
-    <button id="next-page" class="button ghost" type="button" disabled>Next</button>
-  </div>
+  <div class="pagination-bar"><button id="previous-page" class="button ghost" type="button" disabled>Previous</button><span id="page-status" class="muted">Page 1</span><button id="next-page" class="button ghost" type="button" disabled>Next</button></div>
 </section>
+
+<div id="flow-drawer-backdrop" class="flow-drawer-backdrop" hidden></div>
+<aside id="flow-drawer" class="flow-drawer" aria-hidden="true" aria-labelledby="flow-drawer-title">
+  <header class="flow-drawer-header">
+    <div><p class="eyebrow">Selected proxy event</p><h3 id="flow-drawer-title">Event details</h3><p id="flow-drawer-subtitle" class="drawer-subtitle">Select a log to inspect it.</p></div>
+    <button id="close-flow-drawer" class="drawer-close" type="button" aria-label="Close event details">×</button>
+  </header>
+  <div class="flow-drawer-body">
+    <div id="flow-drawer-loading" class="drawer-loading" hidden>Loading event details…</div>
+    <div id="flow-drawer-error" class="alert error" hidden></div>
+    <div id="flow-drawer-content" class="flow-drawer-content"></div>
+  </div>
+  <footer class="flow-drawer-footer"><a id="flow-full-page-link" class="button ghost" href="#">Open full detail page</a></footer>
+</aside>
 {% endblock %}

@@ -17,6 +17,14 @@ def _dump(data: Any) -> str:
         return json.dumps(data, default=str, ensure_ascii=False)
 
 
+def _header_value(headers: dict[str, Any], name: str) -> str | None:
+    wanted = name.lower()
+    for key, value in (headers or {}).items():
+        if str(key).lower() == wanted:
+            return str(value)
+    return None
+
+
 @dataclass(slots=True)
 class FlowSearch:
     q: str | None = None
@@ -63,7 +71,9 @@ class FlowRepository:
     _SUMMARY_COLUMNS = """
         id, session_id, started_at, updated_at, method, url, host,
         status_code, duration_ms, highest_severity, event_type, state,
-        error_message, intercepted_tls, finding_count
+        error_message, intercepted_tls, finding_count, client_address,
+        server_address, scheme, port, http_version, user_agent, content_type,
+        request_size, response_size, tags_json
     """
 
     def __init__(self, conn: sqlite3.Connection):
@@ -76,8 +86,10 @@ class FlowRepository:
             INSERT OR REPLACE INTO flows(
                 id,session_id,started_at,updated_at,method,url,host,status_code,
                 duration_ms,highest_severity,event_type,state,error_message,
-                intercepted_tls,finding_count,data
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                intercepted_tls,finding_count,client_address,server_address,
+                scheme,port,http_version,user_agent,content_type,request_size,
+                response_size,tags_json,data
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 flow.id,
@@ -95,6 +107,16 @@ class FlowRepository:
                 flow.error_message,
                 int(flow.intercepted_tls),
                 len(flow.findings),
+                flow.client_address or "",
+                flow.server_address or "",
+                flow.request.scheme or "",
+                flow.request.port,
+                (response.http_version if response else None) or flow.request.http_version or "",
+                _header_value(flow.request.headers, "user-agent") or "",
+                (_header_value(response.headers, "content-type") if response else None) or "",
+                int(flow.request.body_size or 0),
+                int(response.body_size or 0) if response else 0,
+                _dump(flow.tags),
                 _dump(flow.model_dump(mode="json")),
             ),
         )
@@ -147,8 +169,13 @@ class FlowRepository:
 
         if search.q:
             needle = f"%{search.q.strip().lower()}%"
-            clauses.append("(LOWER(url) LIKE ? OR LOWER(host) LIKE ? OR LOWER(method) LIKE ? OR LOWER(COALESCE(error_message,'')) LIKE ? OR LOWER(data) LIKE ?)")
-            params.extend([needle, needle, needle, needle, needle])
+            clauses.append(
+                "(LOWER(url) LIKE ? OR LOWER(host) LIKE ? OR LOWER(method) LIKE ? "
+                "OR LOWER(COALESCE(client_address,'')) LIKE ? OR LOWER(COALESCE(server_address,'')) LIKE ? "
+                "OR LOWER(COALESCE(user_agent,'')) LIKE ? OR LOWER(COALESCE(content_type,'')) LIKE ? "
+                "OR LOWER(COALESCE(error_message,'')) LIKE ? OR LOWER(data) LIKE ?)"
+            )
+            params.extend([needle] * 9)
         if search.host:
             clauses.append("LOWER(host) LIKE ?")
             params.append(f"%{search.host.strip().lower()}%")
@@ -216,7 +243,15 @@ class FlowRepository:
             f"SELECT {self._SUMMARY_COLUMNS} FROM flows{where} ORDER BY updated_at {order}, started_at {order} LIMIT ? OFFSET ?",
             [*params, limit, offset],
         ).fetchall()
-        return [dict(row) for row in rows], int(total)
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["tags"] = json.loads(item.pop("tags_json") or "[]")
+            except (TypeError, json.JSONDecodeError):
+                item["tags"] = []
+            items.append(item)
+        return items, int(total)
 
     def recent(self, limit: int = 100) -> list[dict[str, Any]]:
         items, _ = self.search(FlowSearch(limit=limit))

@@ -8,7 +8,7 @@
 ██║██║ ╚═╝ ██║██║  ██║      ██║     ██║  ██║╚██████╔╝██╔╝ ██╗   ██║
 ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 Defensive HTTP/HTTPS Inspection Proxy
-Version: 0.1.81
+Version: 0.1.82
 ```
 
 imr-proxy is a professional defensive HTTP/HTTPS inspection proxy for authorized security assessments, internal audits, QA testing, developer debugging, lab environments, and bug bounty scopes.
@@ -34,6 +34,8 @@ Use this tool only on systems you own or are explicitly authorized to test. Do n
 - Secret redaction by default.
 - Export to JSON, CSV, HAR, Markdown, and HTML.
 - Terminal live output with Rich.
+- Compact raw-style live traffic console with source, destination, protocol, User-Agent, sizes, duration, and finding metadata.
+- Click-to-inspect right-side event drawer on desktop with full request, response, TLS, metadata, cookies, bodies, and findings.
 - Local FastAPI web UI with login portal and SQLite-backed console users.
 - Replay for safe methods by default.
 - SQLite session storage.
@@ -126,7 +128,7 @@ python -m pip install -e .
 imr-proxy --version
 ```
 
-If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.81 because the correct environment is `<project-root>\.venv`.
+If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.82 because the correct environment is `<project-root>\.venv`.
 
 ## Quick start
 
@@ -247,6 +249,13 @@ imr-proxy start --terminal --jsonl
 imr-proxy start --quiet
 ```
 
+
+## Compact traffic console
+
+The dashboard presents captured events as dense, raw-style log lines rather than a wide table. Each line prioritizes timestamp, lifecycle type/state, method, status, destination, source, protocol, User-Agent, request/response sizes, content type, duration, findings, and tags. Select a line to open the authenticated detail drawer from the right side of desktop screens. On narrow displays the drawer uses the full viewport. The drawer updates when the selected flow changes from pending to complete.
+
+The terminal mode uses the same compact field priorities and truncates long lines to the current terminal width instead of wrapping large URLs or User-Agent values over multiple lines.
+
 ## Session storage and exports
 
 SQLite stores sessions, flows, requests, responses, headers, cookies, redirect hints, findings, raw bodies when allowed, metadata, timings, version, and config snapshots.
@@ -278,7 +287,7 @@ When TLS passthrough is enabled, the proxy can record the CONNECT destination an
 
 ### Web UI returns 500 on `/`
 
-Version 0.1.8 fixes Web UI crashes caused by Starlette/FastAPI template rendering API changes. Reinstall from the new project root and verify `imr-proxy --version` returns `0.1.81`.
+Version 0.1.8 fixes Web UI crashes caused by Starlette/FastAPI template rendering API changes. Reinstall from the new project root and verify `imr-proxy --version` returns `0.1.82`.
 
 Version 0.1.8 also fixes Linux test/development parity by removing the pytest async plugin requirement from the engine test and by creating a Linux user launcher at `~/.local/bin/imr-proxy`.
 

@@ -2,6 +2,19 @@
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.1.82] - 2026-07-14
+
+### Added
+- Added an information-dense raw-style traffic stream showing source, destination, protocol, User-Agent, request/response sizes, content type, duration, findings, and tags.
+- Added a dynamic authenticated event-inspection drawer that opens from the right on desktop and becomes a full-screen panel on mobile.
+- Added compact summary fields and backward-compatible SQLite migration/backfill for existing captured traffic.
+- Added tests for compact API summaries, source/User-Agent search, CLI log details, and drawer markup.
+
+### Changed
+- Replaced the wide dashboard traffic table with compact selectable log lines while retaining WebSocket live updates, pagination, and advanced filtering.
+- Expanded Rich terminal output with source, destination, protocol, User-Agent, content type, sizes, duration, findings, and tags on one truncated line.
+- Updated static asset cache keys for the compact console UI.
+
 ## [0.1.81] - 2026-07-13
 
 ### Added

@@ -23,6 +23,16 @@ CREATE TABLE IF NOT EXISTS flows (
     error_message TEXT,
     intercepted_tls INTEGER NOT NULL DEFAULT 0,
     finding_count INTEGER NOT NULL DEFAULT 0,
+    client_address TEXT,
+    server_address TEXT,
+    scheme TEXT,
+    port INTEGER,
+    http_version TEXT,
+    user_agent TEXT,
+    content_type TEXT,
+    request_size INTEGER NOT NULL DEFAULT 0,
+    response_size INTEGER NOT NULL DEFAULT 0,
+    tags_json TEXT NOT NULL DEFAULT '[]',
     data TEXT NOT NULL,
     FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
