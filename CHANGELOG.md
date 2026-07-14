@@ -2,6 +2,17 @@
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.1.83] - 2026-07-14
+
+### Fixed
+- Removed the per-request `last_seen_at` session write that contended with high-volume proxy flow capture and caused repeated `sqlite3.OperationalError: database is locked` failures.
+- Replaced the shared Web UI SQLite connection with short-lived per-request connections so FastAPI worker threads never use one connection concurrently.
+- Added bounded retries and rollback handling for essential user/session writes, while non-critical session maintenance is best-effort.
+- Added controlled HTTP 503 responses for rare transient SQLite busy conditions instead of uncaught ASGI 500 tracebacks.
+
+### Improved
+- Tuned per-connection SQLite settings for WAL workloads and added concurrency regression tests covering held writer locks and simultaneous flow capture/API reads.
+
 ## [0.1.82] - 2026-07-14
 
 ### Added

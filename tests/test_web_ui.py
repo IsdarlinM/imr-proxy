@@ -113,7 +113,7 @@ def test_mobile_assets_and_responsive_markup(tmp_path):
     login_page = client.get("/login")
     assert login_page.status_code == 200
     assert "viewport-fit=cover" in login_page.text
-    assert "style.css?v=0.1.82-console-r1" in login_page.text
+    assert "style.css?v=0.1.83-console-r1" in login_page.text
 
     _login(client)
     dashboard = client.get("/")
@@ -126,7 +126,7 @@ def test_mobile_assets_and_responsive_markup(tmp_path):
     assert 'id="filter-event-type"' in dashboard.text
     assert 'id="filter-tls"' in dashboard.text
     assert 'id="toggle-live"' in dashboard.text
-    assert "app.js?v=0.1.82-console-r1" in dashboard.text
+    assert "app.js?v=0.1.83-console-r1" in dashboard.text
 
     stylesheet = client.get("/static/style.css")
     assert stylesheet.status_code == 200

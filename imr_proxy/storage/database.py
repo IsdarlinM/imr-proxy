@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import json
 import sqlite3
 import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 
 _BUSY_TIMEOUT_MS = 30_000
@@ -9,18 +13,48 @@ _INIT_RETRIES = 8
 
 
 def connect(path: Path) -> sqlite3.Connection:
+    """Open a configured SQLite connection.
+
+    Every thread/request must use its own connection.  ``check_same_thread`` is
+    disabled only because FastAPI may create and close a connection in
+    different worker contexts; the connection must never be shared concurrently.
+    WAL is enabled by the schema bootstrap and the per-connection pragmas keep
+    readers lightweight while the proxy writes traffic.
+    """
+
     p = path.expanduser().resolve()
     p.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(p, timeout=_BUSY_TIMEOUT_MS / 1000, check_same_thread=False)
+    conn = sqlite3.connect(
+        p,
+        timeout=_BUSY_TIMEOUT_MS / 1000,
+        check_same_thread=False,
+    )
     conn.row_factory = sqlite3.Row
     conn.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA temp_store=MEMORY")
+    conn.execute("PRAGMA cache_size=-16384")
     return conn
+
+
+@contextmanager
+def connection(path: Path) -> Iterator[sqlite3.Connection]:
+    """Yield a short-lived connection and always close/rollback safely."""
+
+    conn = connect(path)
+    try:
+        yield conn
+    except BaseException:
+        if conn.in_transaction:
+            conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _is_locked(exc: sqlite3.OperationalError) -> bool:
     return "locked" in str(exc).lower() or "busy" in str(exc).lower()
-
 
 
 def _ensure_flow_columns(conn: sqlite3.Connection) -> None:
@@ -28,8 +62,9 @@ def _ensure_flow_columns(conn: sqlite3.Connection) -> None:
 
     SQLite does not support ``ADD COLUMN IF NOT EXISTS`` on all versions we
     support, so inspect the table first. This keeps upgrades compatible with
-    databases created by earlier 0.1.8 builds.
+    databases created by earlier builds.
     """
+
     existing = {row["name"] for row in conn.execute("PRAGMA table_info(flows)").fetchall()}
     additions = {
         "updated_at": "TEXT",
@@ -54,14 +89,16 @@ def _ensure_flow_columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE flows ADD COLUMN {name} {definition}")
     conn.execute("UPDATE flows SET updated_at=COALESCE(updated_at, started_at)")
     conn.execute("UPDATE flows SET event_type=COALESCE(NULLIF(event_type,''), 'http')")
-    conn.execute("UPDATE flows SET state=COALESCE(NULLIF(state,''), CASE WHEN status_code IS NULL THEN 'pending' ELSE 'complete' END)")
+    conn.execute(
+        "UPDATE flows SET state=COALESCE(NULLIF(state,''), "
+        "CASE WHEN status_code IS NULL THEN 'pending' ELSE 'complete' END)"
+    )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_event_state ON flows(event_type, state)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_severity ON flows(highest_severity)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_updated_at ON flows(updated_at DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_client_address ON flows(client_address)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flows_user_agent ON flows(user_agent)")
 
-    # Backfill compact-console summary fields for databases created by older builds.
     rows = conn.execute(
         """
         SELECT id, data FROM flows
@@ -145,6 +182,8 @@ def init_db(conn: sqlite3.Connection) -> None:
         except sqlite3.OperationalError as exc:
             if not _is_locked(exc):
                 raise
+            if conn.in_transaction:
+                conn.rollback()
             last_error = exc
             time.sleep(0.05 * (2**attempt))
     if last_error is not None:

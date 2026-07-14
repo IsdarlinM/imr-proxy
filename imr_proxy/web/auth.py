@@ -6,6 +6,7 @@ import hmac
 import re
 import secrets
 import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -13,6 +14,7 @@ PASSWORD_SCHEME = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 260_000
 SESSION_COOKIE = "imr_proxy_session"
 SESSION_TTL_HOURS = 12
+_WRITE_RETRIES = 6
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9_.@-]{3,64}$")
 
 
@@ -66,6 +68,41 @@ class UserRepository:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
 
+    @staticmethod
+    def _is_locked(exc: sqlite3.OperationalError) -> bool:
+        message = str(exc).lower()
+        return "locked" in message or "busy" in message
+
+    def _write(self, operation, *, error_message: str = "Database is busy. Try again."):
+        """Run a short write transaction with bounded retry and rollback."""
+
+        last_error: sqlite3.OperationalError | None = None
+        for attempt in range(_WRITE_RETRIES):
+            try:
+                result = operation()
+                self.conn.commit()
+                return result
+            except sqlite3.OperationalError as exc:
+                if not self._is_locked(exc):
+                    raise
+                if self.conn.in_transaction:
+                    self.conn.rollback()
+                last_error = exc
+                time.sleep(0.02 * (2**attempt))
+        raise AuthError(error_message) from last_error
+
+    def _best_effort_write(self, operation) -> None:
+        """Attempt non-critical maintenance without breaking authenticated reads."""
+
+        try:
+            operation()
+            self.conn.commit()
+        except sqlite3.OperationalError as exc:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            if not self._is_locked(exc):
+                raise
+
     def ensure_default_admin(self) -> None:
         """Create the default admin account only for a fresh user database.
 
@@ -82,16 +119,18 @@ class UserRepository:
 
         now = utc_now().isoformat()
         password_hash = hash_password("admin")
-        self.conn.execute(
-            """
-            INSERT OR IGNORE INTO users(
-                username,password_hash,is_admin,is_active,must_change_password,
-                created_at,updated_at,created_by
-            ) VALUES(?,?,?,?,?,?,?,?)
-            """,
-            ("admin", password_hash, 1, 1, 1, now, now, "system"),
+        self._write(
+            lambda: self.conn.execute(
+                """
+                INSERT OR IGNORE INTO users(
+                    username,password_hash,is_admin,is_active,must_change_password,
+                    created_at,updated_at,created_by
+                ) VALUES(?,?,?,?,?,?,?,?)
+                """,
+                ("admin", password_hash, 1, 1, 1, now, now, "system"),
+            ),
+            error_message="Unable to initialize the default administrator because the database remained busy.",
         )
-        self.conn.commit()
 
     def create_user(
         self,
@@ -106,14 +145,15 @@ class UserRepository:
         now = utc_now().isoformat()
         password_hash = hash_password(password)
         try:
-            self.conn.execute(
-                """
-                INSERT INTO users(username,password_hash,is_admin,is_active,must_change_password,created_at,updated_at,created_by)
-                VALUES(?,?,?,?,?,?,?,?)
-                """,
-                (normalized, password_hash, int(is_admin), 1, int(must_change_password), now, now, created_by),
+            self._write(
+                lambda: self.conn.execute(
+                    """
+                    INSERT INTO users(username,password_hash,is_admin,is_active,must_change_password,created_at,updated_at,created_by)
+                    VALUES(?,?,?,?,?,?,?,?)
+                    """,
+                    (normalized, password_hash, int(is_admin), 1, int(must_change_password), now, now, created_by),
+                )
             )
-            self.conn.commit()
         except sqlite3.IntegrityError as exc:
             raise AuthError(f"User already exists: {normalized}") from exc
         return self.get_user(normalized) or {"username": normalized}
@@ -150,8 +190,12 @@ class UserRepository:
         if not verify_password(password, user["password_hash"]):
             return None
         now = utc_now().isoformat()
-        self.conn.execute("UPDATE users SET last_login_at=?, updated_at=? WHERE username=?", (now, now, user["username"]))
-        self.conn.commit()
+        self._best_effort_write(
+            lambda: self.conn.execute(
+                "UPDATE users SET last_login_at=?, updated_at=? WHERE username=?",
+                (now, now, user["username"]),
+            )
+        )
         user.pop("password_hash", None)
         return user
 
@@ -161,19 +205,24 @@ class UserRepository:
         if not user:
             raise AuthError(f"User not found: {normalized}")
         now = utc_now().isoformat()
-        self.conn.execute(
-            "UPDATE users SET password_hash=?, must_change_password=?, updated_at=? WHERE username=?",
-            (hash_password(password), int(must_change_password), now, normalized),
+        self._write(
+            lambda: self.conn.execute(
+                "UPDATE users SET password_hash=?, must_change_password=?, updated_at=? WHERE username=?",
+                (hash_password(password), int(must_change_password), now, normalized),
+            )
         )
-        self.conn.commit()
 
     def set_active(self, username: str, active: bool) -> None:
         normalized = validate_username(username)
         if normalized == "admin" and not active:
             raise AuthError("The default admin user cannot be disabled from this command.")
         now = utc_now().isoformat()
-        cur = self.conn.execute("UPDATE users SET is_active=?, updated_at=? WHERE username=?", (int(active), now, normalized))
-        self.conn.commit()
+        cur = self._write(
+            lambda: self.conn.execute(
+                "UPDATE users SET is_active=?, updated_at=? WHERE username=?",
+                (int(active), now, normalized),
+            )
+        )
         if cur.rowcount == 0:
             raise AuthError(f"User not found: {normalized}")
 
@@ -181,8 +230,7 @@ class UserRepository:
         normalized = validate_username(username)
         if normalized == "admin":
             raise AuthError("The default admin user cannot be deleted from this command.")
-        cur = self.conn.execute("DELETE FROM users WHERE username=?", (normalized,))
-        self.conn.commit()
+        cur = self._write(lambda: self.conn.execute("DELETE FROM users WHERE username=?", (normalized,)))
         if cur.rowcount == 0:
             raise AuthError(f"User not found: {normalized}")
 
@@ -193,32 +241,44 @@ class UserRepository:
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
         now = utc_now()
         expires_at = now + timedelta(hours=SESSION_TTL_HOURS)
-        self.conn.execute(
-            """
-            INSERT INTO web_sessions(token_hash,username,csrf_token,created_at,expires_at,last_seen_at,user_agent,ip_address)
-            VALUES(?,?,?,?,?,?,?,?)
-            """,
-            (
-                token_hash,
-                normalized,
-                csrf_token,
-                now.isoformat(),
-                expires_at.isoformat(),
-                now.isoformat(),
-                user_agent,
-                ip_address,
+        self._write(
+            lambda: self.conn.execute(
+                """
+                INSERT INTO web_sessions(token_hash,username,csrf_token,created_at,expires_at,last_seen_at,user_agent,ip_address)
+                VALUES(?,?,?,?,?,?,?,?)
+                """,
+                (
+                    token_hash,
+                    normalized,
+                    csrf_token,
+                    now.isoformat(),
+                    expires_at.isoformat(),
+                    now.isoformat(),
+                    user_agent,
+                    ip_address,
+                ),
             ),
+            error_message="Unable to create the web session because the database remained busy.",
         )
-        self.conn.commit()
         return token, csrf_token
 
-    def get_session_user(self, token: str | None) -> dict[str, Any] | None:
+    def get_session_user(self, token: str | None, *, touch: bool = False) -> dict[str, Any] | None:
+        """Validate a session using a read-only hot path.
+
+        ``touch`` is disabled by default because authentication runs for every
+        dashboard/API request. Writing ``last_seen_at`` on every request caused
+        SQLite writer contention with high-volume proxy capture. When explicitly
+        requested, the maintenance update is best-effort and can never turn a
+        valid authenticated read into a 500 response.
+        """
+
         if not token:
             return None
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
         row = self.conn.execute(
             """
-            SELECT s.username,s.csrf_token,s.expires_at,u.is_admin,u.is_active,u.must_change_password,u.last_login_at
+            SELECT s.username,s.csrf_token,s.expires_at,s.last_seen_at,
+                   u.is_admin,u.is_active,u.must_change_password,u.last_login_at
             FROM web_sessions s JOIN users u ON u.username=s.username
             WHERE s.token_hash=?
             """,
@@ -228,28 +288,49 @@ class UserRepository:
             return None
         data = dict(row)
         if not data["is_active"]:
-            self.delete_session(token)
+            self._best_effort_write(
+                lambda: self.conn.execute("DELETE FROM web_sessions WHERE token_hash=?", (token_hash,))
+            )
             return None
         try:
             expires_at = datetime.fromisoformat(data["expires_at"])
         except ValueError:
-            self.delete_session(token)
+            self._best_effort_write(
+                lambda: self.conn.execute("DELETE FROM web_sessions WHERE token_hash=?", (token_hash,))
+            )
             return None
         if expires_at <= utc_now():
-            self.delete_session(token)
+            self._best_effort_write(
+                lambda: self.conn.execute("DELETE FROM web_sessions WHERE token_hash=?", (token_hash,))
+            )
             return None
-        self.conn.execute("UPDATE web_sessions SET last_seen_at=? WHERE token_hash=?", (utc_now().isoformat(), token_hash))
-        self.conn.commit()
+        if touch:
+            now = utc_now().isoformat()
+            self._best_effort_write(
+                lambda: self.conn.execute(
+                    "UPDATE web_sessions SET last_seen_at=? WHERE token_hash=?",
+                    (now, token_hash),
+                )
+            )
+            data["last_seen_at"] = now
         return data
 
     def delete_session(self, token: str | None) -> None:
         if not token:
             return
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-        self.conn.execute("DELETE FROM web_sessions WHERE token_hash=?", (token_hash,))
-        self.conn.commit()
+        self._best_effort_write(
+            lambda: self.conn.execute("DELETE FROM web_sessions WHERE token_hash=?", (token_hash,))
+        )
 
     def purge_expired_sessions(self) -> int:
-        cur = self.conn.execute("DELETE FROM web_sessions WHERE expires_at <= ?", (utc_now().isoformat(),))
-        self.conn.commit()
-        return cur.rowcount
+        try:
+            cur = self._write(
+                lambda: self.conn.execute(
+                    "DELETE FROM web_sessions WHERE expires_at <= ?",
+                    (utc_now().isoformat(),),
+                )
+            )
+            return cur.rowcount
+        except AuthError:
+            return 0

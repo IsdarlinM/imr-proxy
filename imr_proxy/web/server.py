@@ -1,23 +1,27 @@
 from __future__ import annotations
 
 import html
+import logging
+import sqlite3
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from imr_proxy.proxy.certificates import load_ca_info
-from imr_proxy.storage.database import connect, init_db
-from imr_proxy.storage.repositories import FlowRepository, SessionRepository
+from imr_proxy.storage.database import connection, init_db
+from imr_proxy.storage.repositories import FlowRepository
 from imr_proxy.version import get_version
 
 from .api import build_api
 from .auth import AuthError, SESSION_COOKIE, UserRepository
 from .websocket import register_traffic_websocket
+
+logger = logging.getLogger(__name__)
 
 PUBLIC_PATH_PREFIXES = ("/static/",)
 PUBLIC_EXACT_PATHS = {"/login", "/favicon.ico"}
@@ -36,6 +40,7 @@ def _client_ip(request: Request) -> str | None:
 
 async def _read_form(request: Request) -> dict[str, str]:
     """Parse x-www-form-urlencoded bodies without adding python-multipart."""
+
     body = await request.body()
     parsed = parse_qs(body.decode("utf-8", errors="replace"), keep_blank_values=True)
     return {key: values[-1] if values else "" for key, values in parsed.items()}
@@ -58,19 +63,36 @@ def _redirect(path: str) -> RedirectResponse:
     return RedirectResponse(path, status_code=303)
 
 
+def _database_busy_response(request: Request) -> Response:
+    """Return a controlled temporary failure instead of an ASGI traceback."""
+
+    headers = {"Retry-After": "1"}
+    if _wants_json(request):
+        return JSONResponse(
+            {"detail": "Traffic storage is temporarily busy. Retry shortly."},
+            status_code=503,
+            headers=headers,
+        )
+    return HTMLResponse(
+        "<h1>Storage temporarily busy</h1><p>Please retry in a moment.</p>",
+        status_code=503,
+        headers=headers,
+    )
+
+
 def create_app(config):
-    conn = connect(config.storage)
-    init_db(conn)
-    flows = FlowRepository(conn)
-    sessions = SessionRepository(conn)
-    users = UserRepository(conn)
-    users.purge_expired_sessions()
+    # Bootstrap/migrate once, then close the connection. Web requests use a
+    # dedicated short-lived connection instead of sharing one connection across
+    # FastAPI worker threads.
+    with connection(config.storage) as conn:
+        init_db(conn)
+        UserRepository(conn).purge_expired_sessions()
 
     app = FastAPI(title="imr-proxy", version=get_version())
     base_dir = Path(__file__).parent
     templates = Jinja2Templates(directory=str(base_dir / "templates"))
     app.mount("/static", StaticFiles(directory=str(base_dir / "static")), name="static")
-    app.include_router(build_api(flows, sessions, users))
+    app.include_router(build_api(config.storage))
     register_traffic_websocket(app, config.storage)
 
     @app.middleware("http")
@@ -78,14 +100,29 @@ def create_app(config):
         path = request.url.path
         if path in PUBLIC_EXACT_PATHS or any(path.startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES):
             return await call_next(request)
-        session = users.get_session_user(request.cookies.get(SESSION_COOKIE))
+        try:
+            with connection(config.storage) as conn:
+                # Authentication is intentionally read-only. Updating
+                # last_seen_at on every API request previously contended with
+                # proxy flow writes and caused sqlite3 "database is locked".
+                session = UserRepository(conn).get_session_user(
+                    request.cookies.get(SESSION_COOKIE),
+                    touch=False,
+                )
+        except sqlite3.OperationalError as exc:
+            logger.warning("SQLite busy while validating web session: %s", exc)
+            return _database_busy_response(request)
         if not session:
             if _wants_json(request):
-                return Response('{"detail":"Authentication required"}', status_code=401, media_type="application/json")
+                return JSONResponse({"detail": "Authentication required"}, status_code=401)
             return _redirect(f"/login?next={html.escape(str(request.url.path))}")
         request.state.user = session
         request.state.csrf_token = session["csrf_token"]
-        return await call_next(request)
+        try:
+            return await call_next(request)
+        except sqlite3.OperationalError as exc:
+            logger.warning("SQLite busy while serving %s: %s", request.url.path, exc)
+            return _database_busy_response(request)
 
     @app.get("/login", response_class=HTMLResponse)
     def login_page(request: Request, next: str = "/"):
@@ -100,20 +137,31 @@ def create_app(config):
         next_path = form.get("next", "/") or "/"
         if not next_path.startswith("/") or next_path.startswith("//"):
             next_path = "/"
-        user = users.authenticate(username, password)
-        if not user:
+        try:
+            with connection(config.storage) as conn:
+                users = UserRepository(conn)
+                user = users.authenticate(username, password)
+                if not user:
+                    request.state.user = None
+                    return _render_template(
+                        templates,
+                        request,
+                        "login.html",
+                        {"next": next_path, "error": "Invalid username or password."},
+                    )
+                token, _csrf = users.create_session(
+                    user["username"],
+                    user_agent=request.headers.get("user-agent"),
+                    ip_address=_client_ip(request),
+                )
+        except AuthError as exc:
             request.state.user = None
             return _render_template(
                 templates,
                 request,
                 "login.html",
-                {"next": next_path, "error": "Invalid username or password."},
+                {"next": next_path, "error": str(exc)},
             )
-        token, _csrf = users.create_session(
-            user["username"],
-            user_agent=request.headers.get("user-agent"),
-            ip_address=_client_ip(request),
-        )
         response = _redirect(next_path)
         response.set_cookie(
             SESSION_COOKIE,
@@ -127,15 +175,18 @@ def create_app(config):
 
     @app.get("/logout")
     def logout(request: Request):
-        users.delete_session(request.cookies.get(SESSION_COOKIE))
+        with connection(config.storage) as conn:
+            UserRepository(conn).delete_session(request.cookies.get(SESSION_COOKIE))
         response = _redirect("/login")
         response.delete_cookie(SESSION_COOKIE)
         return response
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request):
-        recent_flows = flows.recent(250)
-        traffic_stats = flows.stats()
+        with connection(config.storage) as conn:
+            flows = FlowRepository(conn)
+            recent_flows = flows.recent(250)
+            traffic_stats = flows.stats()
         stats = {
             "total_flows": traffic_stats["total"],
             "high_risk": traffic_stats["high_risk"],
@@ -154,12 +205,9 @@ def create_app(config):
 
     @app.get("/flows/{flow_id}", response_class=HTMLResponse)
     def flow_detail(request: Request, flow_id: str):
-        return _render_template(
-            templates,
-            request,
-            "flow_detail.html",
-            {"flow": flows.get(flow_id)},
-        )
+        with connection(config.storage) as conn:
+            flow = FlowRepository(conn).get(flow_id)
+        return _render_template(templates, request, "flow_detail.html", {"flow": flow})
 
     @app.get("/certificates", response_class=HTMLResponse)
     def certificates(request: Request):
@@ -180,11 +228,13 @@ def create_app(config):
     def users_page(request: Request):
         if not request.state.user["is_admin"]:
             return Response("Forbidden", status_code=403)
+        with connection(config.storage) as conn:
+            user_list = UserRepository(conn).list_users()
         return _render_template(
             templates,
             request,
             "users.html",
-            {"users": users.list_users(), "message": None, "error": None},
+            {"users": user_list, "message": None, "error": None},
         )
 
     @app.post("/users/create")
@@ -195,23 +245,28 @@ def create_app(config):
         if form.get("csrf_token") != request.state.csrf_token:
             return Response("Invalid CSRF token", status_code=400)
         try:
-            users.create_user(
-                form.get("username", ""),
-                form.get("password", ""),
-                is_admin=form.get("is_admin") == "on",
-                must_change_password=form.get("must_change_password") == "on",
-                created_by=request.state.user["username"],
-            )
+            with connection(config.storage) as conn:
+                users = UserRepository(conn)
+                users.create_user(
+                    form.get("username", ""),
+                    form.get("password", ""),
+                    is_admin=form.get("is_admin") == "on",
+                    must_change_password=form.get("must_change_password") == "on",
+                    created_by=request.state.user["username"],
+                )
+                user_list = users.list_users()
             message = f"User {form.get('username','').strip().lower()} created."
             error = None
         except AuthError as exc:
+            with connection(config.storage) as conn:
+                user_list = UserRepository(conn).list_users()
             message = None
             error = str(exc)
         return _render_template(
             templates,
             request,
             "users.html",
-            {"users": users.list_users(), "message": message, "error": error},
+            {"users": user_list, "message": message, "error": error},
         )
 
     @app.post("/users/password")
@@ -222,21 +277,26 @@ def create_app(config):
         if form.get("csrf_token") != request.state.csrf_token:
             return Response("Invalid CSRF token", status_code=400)
         try:
-            users.set_password(
-                form.get("username", ""),
-                form.get("password", ""),
-                must_change_password=form.get("must_change_password") == "on",
-            )
+            with connection(config.storage) as conn:
+                users = UserRepository(conn)
+                users.set_password(
+                    form.get("username", ""),
+                    form.get("password", ""),
+                    must_change_password=form.get("must_change_password") == "on",
+                )
+                user_list = users.list_users()
             message = f"Password updated for {form.get('username','').strip().lower()}."
             error = None
         except AuthError as exc:
+            with connection(config.storage) as conn:
+                user_list = UserRepository(conn).list_users()
             message = None
             error = str(exc)
         return _render_template(
             templates,
             request,
             "users.html",
-            {"users": users.list_users(), "message": message, "error": error},
+            {"users": user_list, "message": message, "error": error},
         )
 
     @app.post("/users/toggle")
@@ -247,13 +307,23 @@ def create_app(config):
         if form.get("csrf_token") != request.state.csrf_token:
             return Response("Invalid CSRF token", status_code=400)
         try:
-            users.set_active(form.get("username", ""), form.get("active") == "1")
+            with connection(config.storage) as conn:
+                users = UserRepository(conn)
+                users.set_active(form.get("username", ""), form.get("active") == "1")
+                user_list = users.list_users()
             message = f"User {form.get('username','')} updated."
             error = None
         except AuthError as exc:
+            with connection(config.storage) as conn:
+                user_list = UserRepository(conn).list_users()
             message = None
             error = str(exc)
-        return _render_template(templates, request, "users.html", {"users": users.list_users(), "message": message, "error": error})
+        return _render_template(
+            templates,
+            request,
+            "users.html",
+            {"users": user_list, "message": message, "error": error},
+        )
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():

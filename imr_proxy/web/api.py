@@ -1,16 +1,25 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from imr_proxy.storage.repositories import FlowSearch
+from imr_proxy.storage.database import connection
+from imr_proxy.storage.repositories import FlowRepository, FlowSearch, SessionRepository
+
+from .auth import UserRepository
 
 
-def build_api(flow_repo, session_repo, user_repo=None):
+def build_api(storage: Path):
+    """Build API routes using one short-lived SQLite connection per request."""
+
     router = APIRouter(prefix="/api")
 
     @router.get("/sessions")
     def sessions():
-        return session_repo.list()
+        with connection(storage) as conn:
+            return SessionRepository(conn).list()
 
     @router.get("/flows")
     def flows(
@@ -56,7 +65,8 @@ def build_api(flow_repo, session_repo, user_repo=None):
             offset=offset,
             order=order,
         )
-        items, total = flow_repo.search(search)
+        with connection(storage) as conn:
+            items, total = FlowRepository(conn).search(search)
         if not meta:
             return items
         return {
@@ -69,26 +79,28 @@ def build_api(flow_repo, session_repo, user_repo=None):
 
     @router.get("/flows/options")
     def flow_options():
-        return flow_repo.filter_options()
+        with connection(storage) as conn:
+            return FlowRepository(conn).filter_options()
 
     @router.get("/traffic/stats")
     def traffic_stats():
-        return flow_repo.stats()
+        with connection(storage) as conn:
+            return FlowRepository(conn).stats()
 
     @router.get("/flows/{flow_id}")
     def flow_detail(flow_id: str):
-        flow = flow_repo.get(flow_id)
+        with connection(storage) as conn:
+            flow = FlowRepository(conn).get(flow_id)
         if not flow:
             raise HTTPException(status_code=404, detail="Flow not found")
         return flow.model_dump(mode="json")
 
     @router.get("/users")
     def users(request: Request):
-        if not user_repo:
-            raise HTTPException(status_code=404, detail="User repository unavailable")
         current = getattr(request.state, "user", None)
         if not current or not current.get("is_admin"):
             raise HTTPException(status_code=403, detail="Administrator required")
-        return user_repo.list_users()
+        with connection(storage) as conn:
+            return UserRepository(conn).list_users()
 
     return router

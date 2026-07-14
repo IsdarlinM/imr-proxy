@@ -49,7 +49,7 @@ def test_compact_summary_fields_and_search(tmp_path):
     conn = connect(tmp_path / "db.sqlite3")
     init_db(conn)
     SessionRepository(conn).create(
-        SessionRecord(id="compact-session", name="compact", version="0.1.82", config_snapshot={})
+        SessionRecord(id="compact-session", name="compact", version="0.1.83", config_snapshot={})
     )
     repo = FlowRepository(conn)
     repo.save(_flow())
@@ -73,7 +73,7 @@ def test_compact_summary_available_through_authenticated_api(tmp_path):
     conn = connect(storage)
     init_db(conn)
     SessionRepository(conn).create(
-        SessionRecord(id="compact-session", name="compact", version="0.1.82", config_snapshot={})
+        SessionRecord(id="compact-session", name="compact", version="0.1.83", config_snapshot={})
     )
     FlowRepository(conn).save(_flow())
     conn.close()

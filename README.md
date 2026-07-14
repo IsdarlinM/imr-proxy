@@ -8,7 +8,7 @@
 ██║██║ ╚═╝ ██║██║  ██║      ██║     ██║  ██║╚██████╔╝██╔╝ ██╗   ██║
 ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝      ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
 Defensive HTTP/HTTPS Inspection Proxy
-Version: 0.1.82
+Version: 0.1.83
 ```
 
 imr-proxy is a professional defensive HTTP/HTTPS inspection proxy for authorized security assessments, internal audits, QA testing, developer debugging, lab environments, and bug bounty scopes.
@@ -128,7 +128,7 @@ python -m pip install -e .
 imr-proxy --version
 ```
 
-If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.82 because the correct environment is `<project-root>\.venv`.
+If you previously ran version 0.1.1 from `scripts\`, it may have created `scripts\.venv`. That environment can be deleted after reinstalling with 0.1.83 because the correct environment is `<project-root>\.venv`.
 
 ## Quick start
 
@@ -280,6 +280,11 @@ Redacted by default: Authorization, Cookie, Set-Cookie, API keys, tokens, passwo
 
 ## Troubleshooting
 
+### `sqlite3.OperationalError: database is locked`
+
+Version 0.1.83 uses a read-only authentication hot path and one SQLite connection per Web/API request. This prevents live traffic capture from being blocked by session heartbeat writes. Stop older imr-proxy processes before upgrading so only one active capture process owns the selected storage file.
+
+
 
 ### A destination appears in CLI logs but not as a full HTTPS URL
 
@@ -287,7 +292,7 @@ When TLS passthrough is enabled, the proxy can record the CONNECT destination an
 
 ### Web UI returns 500 on `/`
 
-Version 0.1.8 fixes Web UI crashes caused by Starlette/FastAPI template rendering API changes. Reinstall from the new project root and verify `imr-proxy --version` returns `0.1.82`.
+Version 0.1.8 fixes Web UI crashes caused by Starlette/FastAPI template rendering API changes. Reinstall from the new project root and verify `imr-proxy --version` returns `0.1.83`.
 
 Version 0.1.8 also fixes Linux test/development parity by removing the pytest async plugin requirement from the engine test and by creating a Linux user launcher at `~/.local/bin/imr-proxy`.
 

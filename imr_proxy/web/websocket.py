@@ -80,7 +80,7 @@ def register_traffic_websocket(app: FastAPI, storage: Path) -> None:
         token = websocket.cookies.get(SESSION_COOKIE)
         subscription = None
         try:
-            user = users.get_session_user(token)
+            user = users.get_session_user(token, touch=False)
             if not user:
                 await _close(websocket, 4401, "Authentication required")
                 return
@@ -137,7 +137,7 @@ def register_traffic_websocket(app: FastAPI, storage: Path) -> None:
                         last_heartbeat = now
 
                 if now - last_auth_check >= _AUTH_RECHECK_SECONDS:
-                    if not users.get_session_user(token):
+                    if not users.get_session_user(token, touch=False):
                         await _close(websocket, 4401, "Session expired")
                         return
                     last_auth_check = now
